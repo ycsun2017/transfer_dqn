@@ -161,7 +161,7 @@ class DynamicModel(nn.Module):
 
     def forward(self, encoder, s, a, no_grad_encoder=True):
         encoding = encoder(s)
-        onehot = torch.nn.functional.one_hot(a, self.num_actions).squeeze()
+        onehot = torch.nn.functional.one_hot(a, self.num_actions).squeeze().float()
         
         state_action = torch.cat((encoding, onehot), dim=1)
         

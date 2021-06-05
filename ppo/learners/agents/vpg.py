@@ -32,7 +32,7 @@ class VPG(nn.Module):
         # elif isinstance(action_space, Box):
         #     self.action_dim = action_space.shape[0]
         #     self.policy = ContActor(state_dim, self.action_dim, hidden_sizes, activation, action_std, self.device).to(self.device)
-        self.dynamic_model = DynamicModel(feature_size, self.action_dim, hidden_units, encoder_layers)
+        self.dynamic_model = DynamicModel(feature_size, self.action_dim, hidden_units, encoder_layers).to(self.device)
 
         self.optimizer = optim.Adam(self.policy.parameters(), lr=learning_rate)
         self.model_optimizer = optim.Adam(self.dynamic_model.parameters(), lr=learning_rate)

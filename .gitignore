@@ -1,0 +1,7 @@
+
+__pycache__/
+data/
+learned_models/
+models/
+results/
+logs/

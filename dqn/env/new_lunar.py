@@ -81,7 +81,7 @@ class NewLunarLander(gym.Env, EzPickle):
 
     continuous = False
 
-    def __init__(self, obs_type='vel', pos_num=10, noisy_dim=1000):
+    def __init__(self, obs_type='vel', pos_num=10, noisy_dim=200):
         EzPickle.__init__(self)
         self.seed()
         self.viewer = None
@@ -342,7 +342,8 @@ class NewLunarLander(gym.Env, EzPickle):
                 1.0 if self.legs[1].ground_contact else 0.0
                 ]
         elif self.obs_type == 'noisy':
-            state = [
+            state = [random.gauss(0, 1) * self.noisy_std + self.noisy_mean for i in range(self.obs_size)]
+            true_state = [
                 (pos.x - VIEWPORT_W/SCALE/2) / (VIEWPORT_W/SCALE/2),
                 (pos.y - (self.helipad_y+LEG_DOWN/SCALE)) / (VIEWPORT_H/SCALE/2),
                 vel.x*(VIEWPORT_W/SCALE/2)/FPS,
@@ -351,7 +352,9 @@ class NewLunarLander(gym.Env, EzPickle):
                 20.0*self.lander.angularVelocity/FPS,
                 1.0 if self.legs[0].ground_contact else 0.0,
                 1.0 if self.legs[1].ground_contact else 0.0
-                ] + [random.gauss(0, 1) * self.noisy_std + self.noisy_mean for i in range(self.obs_size - 8)]
+                ] #+ [random.gauss(0, 1) * self.noisy_std + self.noisy_mean for i in range(self.obs_size - 8)]
+            for i in range(len(true_state)):
+                state[i+10] = true_state[i]
                 
         assert len(state) == self.obs_size
 
