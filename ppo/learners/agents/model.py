@@ -109,7 +109,7 @@ class EncodedActor(nn.Module):
     def get_dist(self, state, device):
         if type(state) == numpy.ndarray:
             state = torch.from_numpy(state).float().to(device) 
-        action_probs = self.action_layer(state)
+        action_probs = self.forward(state)
         dist = Categorical(action_probs)
         
         return dist
@@ -188,32 +188,54 @@ class QValue(nn.Module):
         return torch.squeeze(q, -1) # Critical to ensure q has right shape.
 
 
-class ActorCritic(nn.Module):
-    def __init__(self, state_dim, action_dim, hidden_sizes, activation):
-        super(ActorCritic, self).__init__()
-        if type(hidden_sizes) == int:
-            hid = [hidden_sizes]
+class EncodedActorCritic(nn.Module):
+    def __init__(self, state_dim, action_dim, feature_size, activation, 
+        hidden_units=64, encoder_layers=2, share_encoder=False):
+        super(EncodedActorCritic, self).__init__()
+
+        self.share = share_encoder
+
+        if share_encoder:
+            self.encoder = LatentEncoder(state_dim, feature_size, encoder_layers, hidden_units)
+            self.actor = mlp([feature_size, action_dim], activation, nn.Softmax(dim=-1))
+            self.critic = mlp([feature_size, 1], activation)
+
         else:
-            hid = list(hidden_sizes)
-        # actor
-        self.action_layer = mlp([state_dim] + hid + [action_dim], activation, nn.Softmax(dim=-1))
+            self.encoder = LatentEncoder(state_dim, feature_size, encoder_layers, hidden_units)
+            self.actor = mlp([feature_size, action_dim], activation, nn.Softmax(dim=-1))
+            self.critic_encoder = LatentEncoder(state_dim, feature_size, encoder_layers, hidden_units)
+            self.critic = mlp([feature_size, 1], activation)
+
+    # def __init__(self, state_dim, action_dim, hidden_sizes, activation):
+    #     super(EncodedActorCritic, self).__init__()
+    #     if type(hidden_sizes) == int:
+    #         hid = [hidden_sizes]
+    #     else:
+    #         hid = list(hidden_sizes)
+    #     # actor
+    #     self.action_layer = mlp([state_dim] + hid + [action_dim], activation, nn.Softmax(dim=-1))
         
-        # critic
-        self.value_layer = mlp([state_dim] + hid + [1], activation)
+    #     # critic
+    #     self.value_layer = mlp([state_dim] + hid + [1], activation)
         
-    def forward(self):
-        raise NotImplementedError
+    def forward(self, state):
+        encoding = self.encoder(state)
+        return self.actor(encoding)
+    
+    def forward_critic(self, state):
+        encoding = self.critic_encoder(state)
+        return self.critic(encoding)
         
     def act(self, state, device):
         state = torch.from_numpy(state).float().to(device) 
-        action_probs = self.action_layer(state)
+        action_probs = self.forward(state)
         dist = Categorical(action_probs)
         action = dist.sample()
         
         return state, action, dist.log_prob(action)
     
     def act_prob(self, state, action, device):
-        action_probs = self.action_layer(state)
+        action_probs = self.forward(state)
         dist = Categorical(action_probs)
         action_logprobs = dist.log_prob(action)
         
@@ -222,19 +244,19 @@ class ActorCritic(nn.Module):
     def get_dist(self, state, device):
         if type(state) == numpy.ndarray:
             state = torch.from_numpy(state).float().to(device) 
-        action_probs = self.action_layer(state)
+        action_probs = self.forward(state)
         dist = Categorical(action_probs)
         
         return dist
     
     def evaluate(self, state, action):
-        action_probs = self.action_layer(state)
+        action_probs = self.forward(state)
         dist = Categorical(action_probs)
         
         action_logprobs = dist.log_prob(action)
         dist_entropy = dist.entropy()
         
-        state_value = self.value_layer(state)
+        state_value = self.forward_critic(state)
         
         return action_logprobs, torch.squeeze(state_value), dist_entropy
     
