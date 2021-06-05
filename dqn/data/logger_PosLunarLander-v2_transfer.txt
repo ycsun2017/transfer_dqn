@@ -1,0 +1,287 @@
+------------------------------Episode 1000------------------------------------
+Num of Interactions with Environment:101.53k
+Mean Training Reward per episode: -163.77
+Average Episode Length: 101.53
+Average Time: 0.18
+Model Loss: 0.32
+Eval Reward:6.54
+------------------------------Episode 2000------------------------------------
+Num of Interactions with Environment:191.20k
+Mean Training Reward per episode: -128.18
+Average Episode Length: 89.67
+Average Time: 0.25
+Model Loss: 0.24
+Eval Reward:-89.63
+------------------------------Episode 3000------------------------------------
+Num of Interactions with Environment:276.89k
+Mean Training Reward per episode: -92.75
+Average Episode Length: 85.69
+Average Time: 0.27
+Model Loss: 0.25
+Eval Reward:-137.22
+------------------------------Episode 4000------------------------------------
+Num of Interactions with Environment:360.09k
+Mean Training Reward per episode: -86.11
+Average Episode Length: 83.20
+Average Time: 0.30
+Model Loss: 0.27
+Eval Reward:-25.55
+------------------------------Episode 5000------------------------------------
+Num of Interactions with Environment:441.50k
+Mean Training Reward per episode: -101.82
+Average Episode Length: 81.41
+Average Time: 0.33
+Model Loss: 0.29
+Eval Reward:-80.90
+------------------------------Episode 6000------------------------------------
+Num of Interactions with Environment:521.66k
+Mean Training Reward per episode: -94.64
+Average Episode Length: 80.16
+Average Time: 0.36
+Model Loss: 0.26
+Eval Reward:-68.36
+------------------------------Episode 7000------------------------------------
+Num of Interactions with Environment:598.59k
+Mean Training Reward per episode: -75.99
+Average Episode Length: 76.93
+Average Time: 0.37
+Model Loss: 0.26
+Eval Reward:-110.90
+------------------------------Episode 8000------------------------------------
+Num of Interactions with Environment:674.25k
+Mean Training Reward per episode: -74.28
+Average Episode Length: 75.66
+Average Time: 0.39
+Model Loss: 0.26
+Eval Reward:-110.21
+------------------------------Episode 9000------------------------------------
+Num of Interactions with Environment:748.69k
+Mean Training Reward per episode: -68.29
+Average Episode Length: 74.44
+Average Time: 0.41
+Model Loss: 0.26
+Eval Reward:19.14
+------------------------------Episode 10000------------------------------------
+Num of Interactions with Environment:821.40k
+Mean Training Reward per episode: -61.77
+Average Episode Length: 72.71
+Average Time: 0.43
+Model Loss: 0.24
+Eval Reward:-138.93
+------------------------------Episode 11000------------------------------------
+Num of Interactions with Environment:893.41k
+Mean Training Reward per episode: -57.66
+Average Episode Length: 72.01
+Average Time: 0.45
+Model Loss: 0.24
+Eval Reward:-26.61
+------------------------------Episode 12000------------------------------------
+Num of Interactions with Environment:963.52k
+Mean Training Reward per episode: -60.93
+Average Episode Length: 70.11
+Average Time: 0.46
+Model Loss: 0.24
+Eval Reward:-25.83
+------------------------------Episode 13000------------------------------------
+Num of Interactions with Environment:1033.93k
+Mean Training Reward per episode: -52.85
+Average Episode Length: 70.42
+Average Time: 0.48
+Model Loss: 0.23
+Eval Reward:-119.05
+------------------------------Episode 14000------------------------------------
+Num of Interactions with Environment:1103.87k
+Mean Training Reward per episode: -53.45
+Average Episode Length: 69.93
+Average Time: 0.48
+Model Loss: 0.21
+Eval Reward:-116.78
+------------------------------Episode 15000------------------------------------
+Num of Interactions with Environment:1173.10k
+Mean Training Reward per episode: -55.39
+Average Episode Length: 69.23
+Average Time: 0.47
+Model Loss: 0.20
+Eval Reward:-62.00
+------------------------------Episode 16000------------------------------------
+Num of Interactions with Environment:1242.78k
+Mean Training Reward per episode: -54.06
+Average Episode Length: 69.68
+Average Time: 0.48
+Model Loss: 0.18
+Eval Reward:-35.90
+------------------------------Episode 17000------------------------------------
+Num of Interactions with Environment:1312.11k
+Mean Training Reward per episode: -54.93
+Average Episode Length: 69.33
+Average Time: 0.47
+Model Loss: 0.16
+Eval Reward:-50.01
+------------------------------Episode 18000------------------------------------
+Num of Interactions with Environment:1382.43k
+Mean Training Reward per episode: -57.87
+Average Episode Length: 70.33
+Average Time: 0.48
+Model Loss: 0.15
+Eval Reward:-31.33
+------------------------------Episode 19000------------------------------------
+Num of Interactions with Environment:1451.71k
+Mean Training Reward per episode: -57.20
+Average Episode Length: 69.28
+Average Time: 0.47
+Model Loss: 0.14
+Eval Reward:-124.72
+------------------------------Episode 20000------------------------------------
+Num of Interactions with Environment:1521.24k
+Mean Training Reward per episode: -58.72
+Average Episode Length: 69.53
+Average Time: 0.48
+Model Loss: 0.13
+Eval Reward:-46.18
+------------------------------Episode 21000------------------------------------
+Num of Interactions with Environment:1591.06k
+Mean Training Reward per episode: -66.19
+Average Episode Length: 69.82
+Average Time: 0.48
+Model Loss: 0.11
+Eval Reward:-3.99
+------------------------------Episode 22000------------------------------------
+Num of Interactions with Environment:1660.19k
+Mean Training Reward per episode: -57.26
+Average Episode Length: 69.13
+Average Time: 0.47
+Model Loss: 0.11
+Eval Reward:-67.94
+------------------------------Episode 23000------------------------------------
+Num of Interactions with Environment:1729.43k
+Mean Training Reward per episode: -61.46
+Average Episode Length: 69.24
+Average Time: 0.48
+Model Loss: 0.10
+Eval Reward:-44.31
+------------------------------Episode 24000------------------------------------
+Num of Interactions with Environment:1799.39k
+Mean Training Reward per episode: -64.43
+Average Episode Length: 69.95
+Average Time: 0.48
+Model Loss: 0.11
+Eval Reward:-85.77
+------------------------------Episode 25000------------------------------------
+Num of Interactions with Environment:1868.39k
+Mean Training Reward per episode: -67.94
+Average Episode Length: 69.00
+Average Time: 0.47
+Model Loss: 0.11
+Eval Reward:-36.15
+------------------------------Episode 26000------------------------------------
+Num of Interactions with Environment:1938.19k
+Mean Training Reward per episode: -71.15
+Average Episode Length: 69.80
+Average Time: 0.48
+Model Loss: 0.11
+Eval Reward:-52.85
+------------------------------Episode 27000------------------------------------
+Num of Interactions with Environment:2007.95k
+Mean Training Reward per episode: -72.88
+Average Episode Length: 69.76
+Average Time: 0.48
+Model Loss: 0.11
+Eval Reward:-111.77
+------------------------------Episode 28000------------------------------------
+Num of Interactions with Environment:2077.72k
+Mean Training Reward per episode: -73.28
+Average Episode Length: 69.77
+Average Time: 0.48
+Model Loss: 0.11
+Eval Reward:-37.87
+------------------------------Episode 29000------------------------------------
+Num of Interactions with Environment:2146.80k
+Mean Training Reward per episode: -56.80
+Average Episode Length: 69.08
+Average Time: 0.47
+Model Loss: 0.11
+Eval Reward:-124.41
+------------------------------Episode 30000------------------------------------
+Num of Interactions with Environment:2216.15k
+Mean Training Reward per episode: -58.98
+Average Episode Length: 69.36
+Average Time: 0.47
+Model Loss: 0.11
+Eval Reward:-39.95
+------------------------------Episode 31000------------------------------------
+Num of Interactions with Environment:2285.94k
+Mean Training Reward per episode: -60.48
+Average Episode Length: 69.79
+Average Time: 0.47
+Model Loss: 0.11
+Eval Reward:-83.37
+------------------------------Episode 32000------------------------------------
+Num of Interactions with Environment:2354.93k
+Mean Training Reward per episode: -55.09
+Average Episode Length: 68.99
+Average Time: 0.47
+Model Loss: 0.11
+Eval Reward:-20.20
+------------------------------Episode 33000------------------------------------
+Num of Interactions with Environment:2424.88k
+Mean Training Reward per episode: -55.87
+Average Episode Length: 69.95
+Average Time: 0.48
+Model Loss: 0.11
+Eval Reward:29.63
+------------------------------Episode 34000------------------------------------
+Num of Interactions with Environment:2494.13k
+Mean Training Reward per episode: -62.67
+Average Episode Length: 69.25
+Average Time: 0.47
+Model Loss: 0.12
+Eval Reward:-71.55
+------------------------------Episode 35000------------------------------------
+Num of Interactions with Environment:2563.62k
+Mean Training Reward per episode: -54.71
+Average Episode Length: 69.49
+Average Time: 0.48
+Model Loss: 0.12
+Eval Reward:-32.96
+------------------------------Episode 36000------------------------------------
+Num of Interactions with Environment:2633.23k
+Mean Training Reward per episode: -54.63
+Average Episode Length: 69.61
+Average Time: 0.48
+Model Loss: 0.11
+Eval Reward:-26.03
+------------------------------Episode 37000------------------------------------
+Num of Interactions with Environment:2702.78k
+Mean Training Reward per episode: -61.08
+Average Episode Length: 69.56
+Average Time: 0.48
+Model Loss: 0.10
+Eval Reward:-90.81
+------------------------------Episode 38000------------------------------------
+Num of Interactions with Environment:2772.70k
+Mean Training Reward per episode: -60.52
+Average Episode Length: 69.92
+Average Time: 0.48
+Model Loss: 0.10
+Eval Reward:-58.87
+------------------------------Episode 39000------------------------------------
+Num of Interactions with Environment:2842.83k
+Mean Training Reward per episode: -61.73
+Average Episode Length: 70.13
+Average Time: 0.48
+Model Loss: 0.10
+Eval Reward:-73.00
+------------------------------Episode 40000------------------------------------
+Num of Interactions with Environment:2912.83k
+Mean Training Reward per episode: -58.66
+Average Episode Length: 70.00
+Average Time: 0.48
+Model Loss: 0.10
+Eval Reward:-25.78
+------------------------------Episode 41000------------------------------------
+Num of Interactions with Environment:2982.28k
+Mean Training Reward per episode: -56.43
+Average Episode Length: 69.45
+Average Time: 0.47
+Model Loss: 0.10
+Eval Reward:-66.43
