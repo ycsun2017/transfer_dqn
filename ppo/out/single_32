@@ -1,0 +1,283 @@
+episode: 0, total reward: -140.45
+episode: 10, total reward: -408.101
+episode: 20, total reward: -29.237
+episode: 30, total reward: -131.894
+episode: 40, total reward: -94.647
+episode: 50, total reward: -119.194
+episode: 60, total reward: -278.607
+episode: 70, total reward: -70.794
+episode: 80, total reward: -90.869
+episode: 90, total reward: -287.49
+episode: 100, total reward: -105.991
+episode: 110, total reward: -145.294
+episode: 120, total reward: -404.201
+episode: 130, total reward: -79.169
+episode: 140, total reward: -128.001
+episode: 150, total reward: -61.396
+episode: 160, total reward: -82.935
+episode: 170, total reward: -113.214
+episode: 180, total reward: -127.351
+episode: 190, total reward: -119.222
+episode: 200, total reward: -107.581
+episode: 210, total reward: -119.497
+episode: 220, total reward: -88.063
+episode: 230, total reward: 0.482
+episode: 240, total reward: -135.138
+episode: 250, total reward: -181.844
+episode: 260, total reward: -102.956
+episode: 270, total reward: -328.51
+episode: 280, total reward: -147.423
+episode: 290, total reward: -113.695
+episode: 300, total reward: -75.858
+episode: 310, total reward: -123.418
+episode: 320, total reward: -99.294
+episode: 330, total reward: -345.866
+episode: 340, total reward: -231.394
+episode: 350, total reward: -10.504
+episode: 360, total reward: -334.238
+episode: 370, total reward: -122.291
+episode: 380, total reward: -120.694
+episode: 390, total reward: -127.198
+episode: 400, total reward: -103.935
+episode: 410, total reward: -77.983
+episode: 420, total reward: -149.592
+episode: 430, total reward: -67.777
+episode: 440, total reward: -142.325
+episode: 450, total reward: -153.774
+episode: 460, total reward: -22.728
+episode: 470, total reward: -62.115
+episode: 480, total reward: -23.952
+episode: 490, total reward: -113.092
+episode: 500, total reward: -76.523
+episode: 510, total reward: -232.634
+episode: 520, total reward: -110.98
+episode: 530, total reward: -126.159
+episode: 540, total reward: -93.287
+episode: 550, total reward: -81.901
+episode: 560, total reward: -144.733
+episode: 570, total reward: -27.573
+episode: 580, total reward: -119.994
+episode: 590, total reward: -165.655
+episode: 600, total reward: -62.614
+episode: 610, total reward: -315.943
+episode: 620, total reward: -87.799
+episode: 630, total reward: -114.181
+episode: 640, total reward: -67.144
+episode: 650, total reward: -103.814
+episode: 660, total reward: -67.002
+episode: 670, total reward: -31.887
+episode: 680, total reward: -150.82
+episode: 690, total reward: -8.424
+episode: 700, total reward: -44.322
+episode: 710, total reward: -92.008
+episode: 720, total reward: -36.157
+episode: 730, total reward: 6.194
+episode: 740, total reward: -11.643
+episode: 750, total reward: -101.001
+episode: 760, total reward: -4.875
+episode: 770, total reward: -15.717
+episode: 780, total reward: -74.861
+episode: 790, total reward: -58.101
+episode: 800, total reward: -20.416
+episode: 810, total reward: 70.607
+episode: 820, total reward: -41.11
+episode: 830, total reward: -40.024
+episode: 840, total reward: 23.767
+episode: 850, total reward: 9.236
+episode: 860, total reward: 45.301
+episode: 870, total reward: 77.289
+episode: 910, total reward: 58.347
+episode: 920, total reward: 42.961
+episode: 950, total reward: 11.122
+episode: 980, total reward: 70.377
+episode: 1000, total reward: -66.561
+episode: 1030, total reward: 43.892
+episode: 1050, total reward: 17.045
+episode: 1060, total reward: 47.063
+episode: 1070, total reward: 34.953
+episode: 1080, total reward: 48.123
+episode: 1140, total reward: -9.417
+episode: 1160, total reward: 25.97
+episode: 1170, total reward: 11.81
+episode: 1200, total reward: -10.933
+episode: 1290, total reward: 43.833
+episode: 1300, total reward: -43.723
+episode: 1340, total reward: 10.837
+episode: 1350, total reward: -47.357
+episode: 1370, total reward: 51.381
+episode: 1400, total reward: 70.673
+episode: 1410, total reward: -7.818
+episode: 1420, total reward: -25.067
+episode: 1430, total reward: 2.758
+episode: 1440, total reward: 44.636
+episode: 1450, total reward: -10.392
+episode: 1460, total reward: 38.642
+episode: 1470, total reward: 16.051
+episode: 1480, total reward: -16.88
+episode: 1490, total reward: -16.521
+episode: 1500, total reward: 22.253
+episode: 1510, total reward: -1.291
+episode: 1520, total reward: -22.485
+episode: 1530, total reward: -21.379
+episode: 1540, total reward: 40.037
+episode: 1550, total reward: 33.671
+episode: 1560, total reward: 33.23
+episode: 1580, total reward: -1.31
+episode: 1590, total reward: 19.132
+episode: 1600, total reward: 7.018
+episode: 1650, total reward: 85.693
+episode: 1670, total reward: 26.526
+episode: 1690, total reward: 29.391
+episode: 1700, total reward: -2.514
+episode: 1710, total reward: 23.471
+episode: 1720, total reward: -1.986
+episode: 1730, total reward: 25.087
+episode: 1740, total reward: 13.953
+episode: 1750, total reward: -10.304
+episode: 1760, total reward: 26.396
+episode: 1770, total reward: 51.244
+episode: 1780, total reward: -28.031
+episode: 1790, total reward: 38.34
+episode: 1800, total reward: 2.926
+episode: 1810, total reward: 39.269
+episode: 1820, total reward: 20.151
+episode: 1830, total reward: -7.418
+episode: 1840, total reward: -53.428
+episode: 1850, total reward: -0.795
+episode: 1860, total reward: -426.99
+episode: 1950, total reward: -120.13
+episode: 2050, total reward: 25.663
+episode: 2060, total reward: 268.652
+episode: 2070, total reward: -3.712
+episode: 2080, total reward: -42.11
+episode: 2090, total reward: 255.727
+episode: 2100, total reward: -24.528
+episode: 2120, total reward: -17.989
+episode: 2170, total reward: -72.297
+episode: 2200, total reward: 238.975
+episode: 2280, total reward: 291.924
+episode: 2290, total reward: -56.173
+episode: 2350, total reward: 26.575
+episode: 2370, total reward: 20.882
+episode: 2380, total reward: 31.152
+episode: 2400, total reward: 31.721
+episode: 2580, total reward: 13.627
+episode: 2610, total reward: 74.166
+episode: 2900, total reward: 229.816
+episode: 2950, total reward: 71.807
+episode: 2980, total reward: -31.159
+episode: 2990, total reward: -43.183
+predict_state.0.weight Parameter containing:
+tensor([[ 0.0809, -0.0193,  0.1071,  ..., -0.0007,  0.1260, -0.1491],
+        [ 0.1148, -0.0723,  0.1256,  ...,  0.1600,  0.0394,  0.1254],
+        [-0.0294, -0.1258,  0.1254,  ...,  0.1424,  0.1009,  0.0197],
+        ...,
+        [ 0.0472, -0.0249, -0.0342,  ..., -0.0164,  0.0452, -0.0721],
+        [-0.0888,  0.2009,  0.0333,  ...,  0.0043,  0.0657, -0.0634],
+        [-0.0694,  0.1494,  0.0332,  ...,  0.0047, -0.0687, -0.1512]],
+       requires_grad=True)
+predict_state.0.bias Parameter containing:
+tensor([-0.0461,  0.0529,  0.1429,  0.1563,  0.1602, -0.1070, -0.0183, -0.0583,
+         0.0134, -0.0028,  0.1210,  0.0775, -0.1076,  0.0195,  0.0591, -0.0600,
+        -0.1004,  0.1590, -0.1491,  0.0908,  0.0185,  0.0969, -0.1055, -0.0529,
+        -0.0307, -0.0628,  0.0800, -0.0112, -0.0307,  0.0311, -0.0718,  0.0658,
+         0.0846, -0.1189,  0.0539, -0.1243,  0.1143,  0.0737,  0.0672,  0.0518,
+        -0.1086, -0.0050, -0.0097, -0.1527, -0.0783,  0.1028, -0.0312, -0.1373,
+         0.0217, -0.0573, -0.1044,  0.0784,  0.0286,  0.0082,  0.0918,  0.0909,
+        -0.0276, -0.0933,  0.1121, -0.0659,  0.0093, -0.0071,  0.1012, -0.0732],
+       requires_grad=True)
+predict_state.2.weight Parameter containing:
+tensor([[ 0.2180, -0.0522, -0.0333,  ...,  0.1245, -0.1150, -0.0488],
+        [ 0.0158, -0.2596,  0.1198,  ..., -0.0091, -0.0117, -0.1102],
+        [ 0.1204, -0.1532,  0.1527,  ...,  0.0984,  0.0862, -0.1507],
+        ...,
+        [ 0.0183, -0.0272, -0.0763,  ...,  0.0189,  0.0467, -0.0165],
+        [ 0.0206,  0.0615,  0.0815,  ..., -0.0479, -0.1547,  0.1087],
+        [ 0.1337,  0.0686, -0.0896,  ...,  0.0863, -0.0068, -0.0404]],
+       requires_grad=True)
+predict_state.2.bias Parameter containing:
+tensor([ 0.0188, -0.0509, -0.0557, -0.0160, -0.0463,  0.0902,  0.0748, -0.0507,
+         0.0854, -0.0529, -0.0797, -0.0864,  0.1359, -0.0574,  0.0912,  0.0785,
+        -0.0344,  0.0490, -0.0291, -0.0022, -0.0474, -0.0986,  0.0887,  0.0171,
+         0.0485, -0.0359,  0.0311, -0.0021,  0.0076,  0.0380,  0.0775, -0.0700,
+        -0.0992,  0.0127,  0.0021, -0.0530,  0.0303, -0.0807,  0.0181,  0.0819,
+        -0.0828,  0.0232,  0.0346,  0.0528,  0.0861, -0.0997,  0.0393, -0.0434,
+         0.0258, -0.0296, -0.1326, -0.0325,  0.0082, -0.0806, -0.0291, -0.0935,
+         0.0228,  0.0118,  0.0440, -0.0209, -0.0230, -0.0732, -0.0014, -0.0271],
+       requires_grad=True)
+predict_state.4.weight Parameter containing:
+tensor([[-0.1497, -0.0504, -0.2836,  ...,  0.3072, -0.0572,  0.0412],
+        [ 0.0732,  0.0875, -0.0376,  ..., -0.0757,  0.0823, -0.1153],
+        [ 0.1165,  0.0008, -0.0227,  ..., -0.0324,  0.2356,  0.0100],
+        ...,
+        [ 0.0517,  0.1340,  0.1160,  ..., -0.0059,  0.0829, -0.0804],
+        [ 0.1739,  0.2092,  0.1327,  ..., -0.2198,  0.2032,  0.0908],
+        [ 0.1321, -0.0525, -0.0518,  ..., -0.0019,  0.1754,  0.1881]],
+       requires_grad=True)
+predict_state.4.bias Parameter containing:
+tensor([-0.0104,  0.0831, -0.0147,  0.0309,  0.0336, -0.0571,  0.0503,  0.0170,
+         0.0446,  0.0699,  0.1201,  0.0093, -0.0091, -0.0760, -0.0557, -0.0418,
+        -0.0452, -0.0709, -0.0694,  0.0631,  0.0498,  0.0219, -0.0361, -0.1236,
+         0.0591,  0.0718,  0.0876, -0.0209,  0.0041,  0.0052, -0.0784, -0.0642],
+       requires_grad=True)
+predict_reward.0.weight Parameter containing:
+tensor([[ 0.0749,  0.0706, -0.1432,  ..., -0.0283, -0.0479, -0.1459],
+        [ 0.1598,  0.0121,  0.1028,  ...,  0.2514, -0.1804,  0.0779],
+        [ 0.1978,  0.1172, -0.0878,  ..., -0.1018, -0.1808, -0.1143],
+        ...,
+        [ 0.0442, -0.0381, -0.0287,  ...,  0.0925, -0.1504,  0.2073],
+        [ 0.1268, -0.1313,  0.0796,  ..., -0.0652, -0.0045,  0.1533],
+        [ 0.1906,  0.0630, -0.1212,  ..., -0.0641, -0.2145,  0.0041]],
+       requires_grad=True)
+predict_reward.0.bias Parameter containing:
+tensor([-0.0158,  0.0856,  0.1051,  0.0268,  0.0233,  0.0091,  0.1423, -0.0751,
+         0.0102,  0.0700, -0.0984,  0.0242,  0.0499,  0.0034,  0.0694,  0.0644,
+         0.0712,  0.1692,  0.1061,  0.0344,  0.1885,  0.0779, -0.0766,  0.0807,
+         0.0872,  0.0513,  0.1374,  0.0538, -0.0197, -0.1399, -0.1130,  0.1028,
+        -0.0300, -0.1646, -0.0209, -0.0007, -0.0147, -0.0041, -0.0806, -0.0352,
+         0.0346, -0.0989,  0.0880, -0.0672, -0.0726,  0.0148,  0.0456,  0.0986,
+         0.1005, -0.1050, -0.1242, -0.1709,  0.0392, -0.0338,  0.0479,  0.1126,
+        -0.1481, -0.0139,  0.0053, -0.1801, -0.0963, -0.0410,  0.0902,  0.1100],
+       requires_grad=True)
+predict_reward.2.weight Parameter containing:
+tensor([[-2.8095e-02,  2.5259e-01,  1.1423e-01,  ...,  2.6165e-02,
+          9.6495e-02,  9.9623e-02],
+        [-7.9985e-02, -9.3343e-02,  7.7082e-05,  ..., -6.1375e-02,
+         -2.9897e-02, -1.1776e-01],
+        [ 1.0204e-01, -1.0959e-01, -4.9612e-02,  ..., -1.3033e-01,
+         -1.4408e-02, -9.3771e-02],
+        ...,
+        [ 6.9171e-02,  1.7507e-01,  1.7088e-02,  ..., -1.1952e-02,
+         -1.1920e-01,  1.4261e-01],
+        [-1.1236e-01,  1.6225e-01,  1.5274e-02,  ...,  9.1239e-02,
+          1.9174e-02,  5.0207e-02],
+        [-1.9595e-03, -8.2604e-02, -6.4032e-03,  ..., -1.4624e-01,
+         -8.2038e-02, -1.0695e-01]], requires_grad=True)
+predict_reward.2.bias Parameter containing:
+tensor([-1.4445e-02,  6.8262e-02,  8.3512e-02, -5.7102e-02, -1.1740e-01,
+        -1.0011e-01, -9.6267e-02,  6.4851e-02,  7.9549e-02, -1.0450e-01,
+        -2.1622e-02, -8.1742e-02, -8.2843e-02, -7.5562e-02,  7.3218e-02,
+         4.7726e-05, -1.1355e-01,  5.1235e-02, -3.5873e-02, -5.7567e-02,
+        -7.0681e-02,  5.5340e-02,  8.9067e-02,  1.3590e-01,  6.8517e-02,
+         2.8085e-02,  5.6824e-02,  8.8702e-02, -4.4615e-02,  3.3058e-02,
+        -1.2071e-01, -6.9243e-02,  2.5546e-02, -3.1385e-02, -9.7152e-02,
+        -3.4791e-02, -7.7639e-02,  7.8522e-02,  1.2632e-01, -8.4517e-02,
+         3.4465e-02,  9.0191e-02,  7.8720e-02,  7.2588e-02,  8.4556e-02,
+        -1.3045e-02,  2.4519e-02, -9.2974e-02,  6.9500e-02, -6.3819e-02,
+        -9.5679e-02,  2.2798e-02,  1.0404e-01, -1.3133e-02,  1.4173e-01,
+         3.5298e-02, -1.2156e-01,  6.0005e-03, -1.2057e-01,  6.3162e-02,
+         4.3499e-03,  7.1047e-02,  1.0005e-01, -9.2220e-02],
+       requires_grad=True)
+predict_reward.4.weight Parameter containing:
+tensor([[-0.3591,  0.2714,  0.2852, -0.1660, -0.1153,  0.1566, -0.1841,  0.2507,
+          0.2596,  0.1757,  0.1709, -0.0046, -0.2403,  0.2563,  0.3065,  0.2291,
+          0.1941, -0.2261, -0.3533, -0.2388,  0.2506,  0.0638, -0.2660, -0.2479,
+         -0.3237, -0.2342, -0.1464,  0.2157, -0.1882, -0.3636,  0.1642, -0.0896,
+         -0.2279, -0.2203,  0.2261,  0.2044,  0.1559, -0.2453, -0.2483, -0.2625,
+         -0.1480, -0.2725,  0.1862, -0.3306, -0.2571,  0.2436,  0.2724,  0.2381,
+          0.1803, -0.0390, -0.1918, -0.3083, -0.2151, -0.0824, -0.2040,  0.2241,
+         -0.0843,  0.2984, -0.1052, -0.2475, -0.2649, -0.2446, -0.2091,  0.2196]],
+       requires_grad=True)
+predict_reward.4.bias Parameter containing:
+tensor([-0.0462], requires_grad=True)
+mean: -47.787190098389246 std 98.72142090933801
