@@ -31,7 +31,7 @@ parser.add_argument('--learner', type=str, default="vpg", help="vpg, ppo, sac")
 parser.add_argument('--lr', type=float, default=1e-3)
 parser.add_argument('--feature-size', type=int, default=16)
 parser.add_argument('--transfer', action='store_true', default=False)
-
+parser.add_argument('--use', type=str, default="both", help="both, actor, critic")
 # file settings
 parser.add_argument('--logdir', type=str, default="logs/")
 parser.add_argument('--resdir', type=str, default="results/")
@@ -79,7 +79,15 @@ if __name__ == '__main__':
         env.seed(random_seed)
     
     filename = env_name + "_" + args.learner + "_n" + str(max_episodes) + \
-        "_f" + str(args.feature_size) + args.exp_name
+        "_f" + str(args.feature_size) 
+    
+    if args.learner == "ppo":
+        filename += "_" + args.use
+
+    if args.transfer:
+        filename += "_transfer"
+    else:
+        filename += "_single"
 
     logger = get_log(args.logdir + filename)
     logger.info(args)
@@ -90,17 +98,18 @@ if __name__ == '__main__':
         policy_net = VPG(env.observation_space, env.action_space, args.feature_size, gamma=gamma, 
                     device=device, learning_rate=lr, transfer=args.transfer)
     elif args.learner == "ppo":
-        policy_net = PPO(env.observation_space, env.action_space, gamma=gamma, device=device, learning_rate=lr)
+        policy_net = PPO(env.observation_space, env.action_space, args.feature_size, gamma=gamma, 
+                    device=device, learning_rate=lr, transfer=args.transfer, use_model=args.use)
     
     
     start_episode = 0
     # load learner from checkpoint
     if args.loadfile != "":
-        if args.transfer:
-            policy_net.load_dynamics(args.moddir + args.loadfile)
-        else:
-            policy_net.load_models(args.moddir + args.loadfile)
-    
+        policy_net.load_models(args.moddir + args.loadfile)
+    if args.transfer:
+        policy_net.load_dynamics(args.moddir + filename.replace("transfer", "single"))
+        print("loaded from", args.moddir + filename.replace("transfer", "single"))
+
     
     memory = Memory()
     op_memory = OPMemory()
