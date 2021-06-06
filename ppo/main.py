@@ -108,6 +108,7 @@ if __name__ == '__main__':
         policy_net.load_models(args.moddir + args.loadfile)
     if args.transfer:
         policy_net.load_dynamics(args.moddir + filename.replace("transfer", "single"))
+#         policy_net.load_dynamics(args.moddir + args.loadfile)
         print("loaded from", args.moddir + filename.replace("transfer", "single"))
 
     
