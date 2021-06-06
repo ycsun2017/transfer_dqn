@@ -7,6 +7,7 @@ import setup
 from learners.memory import Memory, OPMemory 
 from learners.agents.vpg import VPG
 from learners.agents.ppo import PPO
+from envs.cart import NewCartPoleEnv
 
 import logging
 from datetime import datetime
@@ -72,7 +73,12 @@ if __name__ == '__main__':
     eps_clip = 0.2              # clip parameter for PPO
     
     # creating environment
-    env = gym.make(env_name)
+    if env_name == "CartPole-normal":
+        env = NewCartPoleEnv(obs_type="normal")
+    elif env_name == "CartPole-hard":
+        env = NewCartPoleEnv(obs_type="hard")
+    else:
+        env = gym.make(env_name)
     
     if random_seed:
         torch.manual_seed(random_seed)
