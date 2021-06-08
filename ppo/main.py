@@ -23,15 +23,18 @@ parser.add_argument('--device', type=str, default="cpu")
 parser.add_argument('--env', type=str, default="CartPole-v0")
 parser.add_argument('--exp-name', type=str, default="")
 parser.add_argument('--episodes', type=int, default=1000)
-parser.add_argument('--steps', type=int, default=300)
+parser.add_argument('--steps', type=int, default=3e5)
 
 parser.add_argument('--log-interval', type=int, default=10)
 
 # learner settings
 parser.add_argument('--learner', type=str, default="vpg", help="vpg, ppo, sac")
 parser.add_argument('--lr', type=float, default=1e-3)
+parser.add_argument('--coeff', type=float, default=5)
+parser.add_argument('--coeff-decay', action='store_true', default=False)
 parser.add_argument('--feature-size', type=int, default=16)
 parser.add_argument('--transfer', action='store_true', default=False)
+parser.add_argument('--source', type=str, default="")
 parser.add_argument('--use', type=str, default="both", help="both, actor, critic")
 # file settings
 parser.add_argument('--logdir', type=str, default="logs/")
@@ -59,15 +62,15 @@ if __name__ == '__main__':
     env_name = args.env #"LunarLander-v2"
     
     max_episodes = args.episodes        # max training episodes
-    max_steps = args.steps         # max timesteps in one episode
+    max_steps = int(args.steps)         # max timesteps in one episode
     lr = args.lr
     device = args.device
     ############ For All #########################
     gamma = 0.99                # discount factor
     random_seed = 0 
     render = False
-    update_every = 300
-    save_every = 100
+    update_every = 1000
+    save_every = 10000
     ############ For PPO #########################
     K_epochs = 4                # update policy for K epochs
     eps_clip = 0.2              # clip parameter for PPO
@@ -84,7 +87,7 @@ if __name__ == '__main__':
         torch.manual_seed(random_seed)
         env.seed(random_seed)
     
-    filename = env_name + "_" + args.learner + "_n" + str(max_episodes) + \
+    filename = env_name + "_" + args.learner + "_n" + str(max_steps) + \
         "_f" + str(args.feature_size) 
     
     if args.learner == "ppo":
@@ -113,55 +116,73 @@ if __name__ == '__main__':
     if args.loadfile != "":
         policy_net.load_models(args.moddir + args.loadfile)
     if args.transfer:
-        policy_net.load_dynamics(args.moddir + filename.replace("transfer", "single"))
-        print("loaded from", args.moddir + filename.replace("transfer", "single"))
+        if args.source != "":
+            sourcefile = filename.replace(env_name, args.source)
+        sourcefile = sourcefile.replace("transfer", "single")
+        policy_net.load_dynamics(args.moddir + sourcefile)
+        print("loaded from", args.moddir + sourcefile)
 
     
     memory = Memory()
     op_memory = OPMemory()
     
-    all_rewards = []
-    timestep = 0
     
-    for episode in range(start_episode, max_episodes):
-        state = env.reset()
-        rewards = []
-        for steps in range(max_steps):
-            timestep += 1
-            
-            if render:
-                env.render()
-                
-            state_tensor, action_tensor, log_prob_tensor = policy_net.act(state)
-            
-            if isinstance(env.action_space, Discrete):
-                action = action_tensor.item()
-            else:
-                action = action_tensor.cpu().data.numpy().flatten()
-            new_state, reward, done, _ = env.step(action)
-            rewards.append(reward)
-            
-            memory.add(state_tensor, action_tensor, log_prob_tensor, reward, done)
-            new_state_tensor = torch.from_numpy(new_state).float().to(device) 
-            op_memory.add(state_tensor, action_tensor, new_state_tensor, reward, done)
+    timestep = 0
+    episode = 0
+    state = env.reset()
+    
 
-            if done or steps == max_steps-1:
-                policy_loss, model_loss = policy_net.update_policy(memory, op_memory)
-                logger.info("ploss: {}, mloss: {}\n".format(policy_loss, model_loss))
-                memory.clear_memory()
-                timestep = 0
+    all_rewards = []
+    rewards = []
+    
+#     while episode < max_episodes:
+#     for episode in range(max_episodes):
+#         for steps in range(max_steps):
+    total_updates = max_steps // update_every
+    def get_coeff(step):
+        if args.coeff_decay:
+            return args.coeff - args.coeff * (step // update_every) / total_updates
+        else:
+            return args.coeff
 
-            state = new_state
-            
-            if done:
-                all_rewards.append(np.sum(rewards))
-                if episode % args.log_interval == 0:
-                    print("episode: {}, total reward: {}".format(episode, np.round(np.sum(rewards), decimals = 3)))
-                
-                rew_file.write("episode: {}, total reward: {}\n".format(episode, np.round(np.sum(rewards), decimals = 3)))
-                break
+    for timestep in range(max_steps):
+        if render:
+            env.render()
 
-        if (episode+1) % save_every == 0:
+        state_tensor, action_tensor, log_prob_tensor = policy_net.act(state)
+
+        if isinstance(env.action_space, Discrete):
+            action = action_tensor.item()
+        else:
+            action = action_tensor.cpu().data.numpy().flatten()
+        new_state, reward, done, _ = env.step(action)
+
+        rewards.append(reward)
+
+        memory.add(state_tensor, action_tensor, log_prob_tensor, reward, done)
+        new_state_tensor = torch.from_numpy(new_state).float().to(device) 
+        op_memory.add(state_tensor, action_tensor, new_state_tensor, reward, done)
+
+        if (timestep+1) % update_every == 0:
+            policy_loss, model_loss = policy_net.update_policy(memory, op_memory, get_coeff(timestep))
+            logger.info("ploss: {}, mloss: {}\n".format(policy_loss, model_loss))
+            memory.clear_memory()
+            if episode >= 1:
+                mean_rewards = np.round(np.mean(all_rewards[-min(10, episode):]))
+                print("step: {}, episode: {}, mean reward of last 10 episodes: {}".format(
+                    timestep+1, episode, mean_rewards))
+                rew_file.write("step: {}, episode: {}, mean reward of last 10 episodes: {}\n".format(
+                    timestep+1, episode, mean_rewards))
+
+        state = new_state
+
+        if done:
+            all_rewards.append(np.sum(rewards))
+            episode += 1
+            rewards = []
+            state = env.reset()
+
+        if (timestep+1) % save_every == 0:
             path = args.moddir + filename
             policy_net.save_models(path)
 

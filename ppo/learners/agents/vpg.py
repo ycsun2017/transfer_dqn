@@ -62,7 +62,7 @@ class VPG(nn.Module):
             self.optimizer.zero_grad()
             p_loss = self.policy_loss(memory)
             m_loss = self.model_loss(op_memory)
-            (p_loss + 0.5 * m_loss).backward()
+            (p_loss + 2 * m_loss).backward()
             self.optimizer.step()
 
         return p_loss, m_loss

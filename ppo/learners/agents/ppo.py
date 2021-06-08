@@ -12,7 +12,7 @@ from .updates import ppo_update
 from torch.distributions import Categorical
 
 class PPO(nn.Module):
-    def __init__(self, state_space, action_space, feature_size, hidden_units=64, encoder_layers=2, 
+    def __init__(self, state_space, action_space, feature_size, hidden_units=64, encoder_layers=2, model_layers=0,
                 K_epochs=4, eps_clip=0.2, activation=nn.Tanh, learning_rate=3e-4, gamma=0.9, device="cpu", 
                 action_std=0.5, transfer=False, share_encoder=False, use_model="both"):
         super(PPO, self).__init__()
@@ -34,18 +34,20 @@ class PPO(nn.Module):
         # elif isinstance(action_space, Box):
         #     self.action_dim = action_space.shape[0]
         #     self.policy = ContActorCritic(state_dim, self.action_dim, hidden_sizes, activation, action_std, self.device).to(self.device)
-        self.dynamic_model = DynamicModel(feature_size, self.action_dim, hidden_units, encoder_layers).to(self.device)
+        self.dynamic_model = DynamicModel(feature_size, self.action_dim, hidden_units, model_layers).to(self.device)
 
         self.optimizer = torch.optim.Adam(self.policy.parameters(), lr=learning_rate)
         self.model_optimizer = optim.Adam(self.dynamic_model.parameters(), lr=learning_rate)
         
+        print("policy", self.policy)
+        print("model", self.dynamic_model)
         self.loss_fn = nn.MSELoss()
     
     def act(self, state):
         return self.policy.act(state, self.device)
         
     
-    def update_policy(self, memory, op_memory):
+    def update_policy(self, memory, op_memory, coeff=1.0):
         ### source task
         if not self.transfer:
             self.optimizer.zero_grad()
@@ -60,10 +62,11 @@ class PPO(nn.Module):
 
         ### target task
         else:
+#             print(coeff)
             self.optimizer.zero_grad()
             p_loss = self.policy_loss(memory)
             m_loss = self.model_loss(op_memory)
-            (p_loss + 0.5 * m_loss).backward()
+            (p_loss + coeff * m_loss).backward()
             self.optimizer.step()
 
         return p_loss, m_loss
@@ -75,6 +78,7 @@ class PPO(nn.Module):
             encoded_next = encoded_next.detach()
         pred_next, pred_rew = self.dynamic_model(encoder, state, action, 
                                 no_grad_encoder=not self.transfer)
+        
         return loss_fn(encoded_next, pred_next) + loss_fn(reward, pred_rew.squeeze())
 
     def model_loss(self, memory):
@@ -120,7 +124,6 @@ class PPO(nn.Module):
             advantages = discounted_reward - state_values.detach()
             surr1 = ratios * advantages
             surr2 = torch.clamp(ratios, 1-self.eps_clip, 1+self.eps_clip) * advantages
-            
             loss = -torch.min(surr1, surr2) + 0.5*self.loss_fn(state_values, discounted_reward) \
                 - 0.01*dist_entropy
         
