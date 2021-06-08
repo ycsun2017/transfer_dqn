@@ -94,7 +94,7 @@ if __name__ == '__main__':
         filename += "_" + args.use
 
     if args.transfer:
-        filename += "_transfer"
+        filename += "_transfer" + "_c" + str(args.coeff) + "_decay" if args.coeff_decay else ""
     else:
         filename += "_single"
 
