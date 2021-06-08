@@ -139,7 +139,6 @@ if __name__ == '__main__':
             else:
                 action = action_tensor.cpu().data.numpy().flatten()
             new_state, reward, done, _ = env.step(action)
-            
             rewards.append(reward)
             
             memory.add(state_tensor, action_tensor, log_prob_tensor, reward, done)

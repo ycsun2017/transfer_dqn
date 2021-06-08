@@ -13,8 +13,8 @@ from torch.distributions import Categorical
 
 class VPG(nn.Module):
     def __init__(self, state_space, action_space, feature_size, hidden_units=64, encoder_layers=2,
-                 activation=nn.Tanh, learning_rate=3e-4, gamma=0.9, device="cpu", action_std=0.5,
-                 transfer=False):
+                 model_layers=0, activation=nn.Tanh, learning_rate=3e-4, gamma=0.9, device="cpu", 
+                 action_std=0.5, transfer=False):
         super(VPG, self).__init__()
         
         # deal with 1d state input
@@ -32,10 +32,13 @@ class VPG(nn.Module):
         # elif isinstance(action_space, Box):
         #     self.action_dim = action_space.shape[0]
         #     self.policy = ContActor(state_dim, self.action_dim, hidden_sizes, activation, action_std, self.device).to(self.device)
-        self.dynamic_model = DynamicModel(feature_size, self.action_dim, hidden_units, encoder_layers).to(self.device)
+        self.dynamic_model = DynamicModel(feature_size, self.action_dim, hidden_units, model_layers).to(self.device)
 
         self.optimizer = optim.Adam(self.policy.parameters(), lr=learning_rate)
         self.model_optimizer = optim.Adam(self.dynamic_model.parameters(), lr=learning_rate)
+
+        print("policy", self.policy)
+        print("model", self.dynamic_model)
     
     def act(self, state):
         return self.policy.act(state, self.device)
