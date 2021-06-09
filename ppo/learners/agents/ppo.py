@@ -14,7 +14,7 @@ from torch.distributions import Categorical
 class PPO(nn.Module):
     def __init__(self, state_space, action_space, feature_size, hidden_units=64, encoder_layers=2, model_layers=0,
                 K_epochs=4, eps_clip=0.2, activation=nn.Tanh, learning_rate=3e-4, gamma=0.9, device="cpu", 
-                action_std=0.5, transfer=False, share_encoder=False, use_model="both"):
+                action_std=0.5, transfer=False, share_encoder=False, use_model="both", no_detach=False):
         super(PPO, self).__init__()
         
         self.gamma = gamma
@@ -24,6 +24,7 @@ class PPO(nn.Module):
         self.transfer = transfer
         self.share = share_encoder
         self.use_model = use_model
+        self.no_detach = no_detach
         # deal with 1d state input
         state_dim = state_space.shape[0]
         
@@ -74,7 +75,7 @@ class PPO(nn.Module):
     def model_loss_single(self, encoder, state, action, next_state, reward):
         loss_fn = torch.nn.MSELoss()
         encoded_next = encoder(next_state)
-        if self.transfer:
+        if not self.no_detach and self.transfer:
             encoded_next = encoded_next.detach()
         pred_next, pred_rew = self.dynamic_model(encoder, state, action, 
                                 no_grad_encoder=not self.transfer)

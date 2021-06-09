@@ -34,6 +34,7 @@ parser.add_argument('--coeff', type=float, default=5)
 parser.add_argument('--coeff-decay', action='store_true', default=False)
 parser.add_argument('--feature-size', type=int, default=16)
 parser.add_argument('--transfer', action='store_true', default=False)
+parser.add_argument('--no-detach', action='store_true', default=False)
 parser.add_argument('--source', type=str, default="")
 parser.add_argument('--use', type=str, default="both", help="both, actor, critic")
 # file settings
@@ -88,7 +89,7 @@ if __name__ == '__main__':
         env.seed(random_seed)
     
     filename = env_name + "_" + args.learner + "_n" + str(max_steps) + \
-        "_f" + str(args.feature_size) 
+        "_f" + str(args.feature_size) + "_lr" + str(args.lr)
     
     if args.learner == "ppo":
         filename += "_" + args.use
@@ -97,6 +98,8 @@ if __name__ == '__main__':
         filename += "_transfer" + "_c" + str(args.coeff) + "_decay" if args.coeff_decay else ""
     else:
         filename += "_single"
+    
+    filename += args.exp_name
 
     logger = get_log(args.logdir + filename)
     logger.info(args)
@@ -108,7 +111,8 @@ if __name__ == '__main__':
                     device=device, learning_rate=lr, transfer=args.transfer)
     elif args.learner == "ppo":
         policy_net = PPO(env.observation_space, env.action_space, args.feature_size, gamma=gamma, 
-                    device=device, learning_rate=lr, transfer=args.transfer, use_model=args.use)
+                    device=device, learning_rate=lr, transfer=args.transfer, use_model=args.use, 
+                    no_detach=args.no_detach)
     
     
     start_episode = 0
@@ -116,11 +120,11 @@ if __name__ == '__main__':
     if args.loadfile != "":
         policy_net.load_models(args.moddir + args.loadfile)
     if args.transfer:
-        if args.source != "":
-            sourcefile = filename.replace(env_name, args.source)
-        sourcefile = sourcefile.replace("transfer", "single")
-        policy_net.load_dynamics(args.moddir + sourcefile)
-        print("loaded from", args.moddir + sourcefile)
+#         if args.source != "":
+#             sourcefile = filename.replace(env_name, args.source)
+#         sourcefile = sourcefile.replace("transfer", "single")
+        policy_net.load_dynamics(args.moddir + args.source)
+        print("loaded from", args.moddir + args.source)
 
     
     memory = Memory()
