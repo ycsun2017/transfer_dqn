@@ -8,6 +8,7 @@ from learners.memory import Memory, OPMemory
 from learners.agents.vpg import VPG
 from learners.agents.ppo import PPO
 from envs.cart import NewCartPoleEnv
+from envs.lunar import NewLunarLanderEnv
 
 import logging
 from datetime import datetime
@@ -81,6 +82,10 @@ if __name__ == '__main__':
         env = NewCartPoleEnv(obs_type="normal")
     elif env_name == "CartPole-hard":
         env = NewCartPoleEnv(obs_type="hard")
+    elif env_name == "LunarLander-normal":
+        env = NewLunarLanderEnv()
+    elif env_name == "LunarLander-noisy":
+        env = NewLunarLanderEnv(obs_type="noisy")
     else:
         env = gym.make(env_name)
     

@@ -56,11 +56,9 @@ class DynamicModel(nn.Module):
         self.num_actions = num_actions
         self.cont = cont
 
-        self.predict_state = encode_mlp(feature_size + num_actions, feature_size, num_layers, hidden_units, 
-                                activation=nn.Tanh(), output_activation=nn.Tanh())
+        self.predict_state = encode_mlp(feature_size + num_actions, feature_size, num_layers, hidden_units)
 
-        self.predict_reward = encode_mlp(feature_size + num_actions, 1, num_layers, hidden_units, 
-                                activation=nn.Tanh(), output_activation=nn.Tanh())
+        self.predict_reward = encode_mlp(feature_size + num_actions, 1, num_layers, hidden_units)
 
     def forward(self, encoder, s, a, no_grad_encoder=True):
         encoding = encoder(s)
