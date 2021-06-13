@@ -115,9 +115,12 @@ class NewLunarLanderEnv(gym.Env, EzPickle):
         else:
             # Nop, fire left engine, main engine, right engine
             self.action_space = spaces.Discrete(4)
-
+            
+        self.max_step = 1000
+        self.total_step = 0
+        
         self.reset()
-
+        
     def seed(self, seed=None):
         self.np_random, seed = seeding.np_random(seed)
         return [seed]
@@ -142,6 +145,7 @@ class NewLunarLanderEnv(gym.Env, EzPickle):
         self.world.DestroyBody(self.legs[1])
 
     def reset(self):
+        self.total_step = 0
         self._destroy()
         self.world.contactListener_keepref = ContactDetector(self)
         self.world.contactListener = self.world.contactListener_keepref
@@ -382,6 +386,10 @@ class NewLunarLanderEnv(gym.Env, EzPickle):
         if self.obs_type == "pos":
             self.update_pos(self.lander.position.x, self.lander.position.y)
         
+        self.total_step += 1
+        if self.total_step >= self.max_step:
+            done = True
+                
         return np.array(state, dtype=np.float32), reward, done, {}
 
     def render(self, mode='human'):
