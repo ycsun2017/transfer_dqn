@@ -152,7 +152,8 @@ def calculate_mean_prediction_error(env, encoder, action_sequence, dyn_model, da
     for a in action_sequence:
         results = dyn_model(encoder, np.expand_dims(obs,axis=0), [a], data_statistics)
         pred_state = results[0]
-        true_state == encoder(from_numpy(env.step(a))).cpu().numpy()
+        normalize  = lambda x: (x - data_statistics['obs_mean'])/data_statistics['obs_std']
+        true_state = encoder(from_numpy(normalize(env.step(a)[0]))).cpu().numpy()
         true_states.append(true_state)
         pred_states.append(pred_state)
         obs,_,_,_ = env.step(a)
@@ -168,7 +169,7 @@ def calculate_mean_prediction_error(env, encoder, action_sequence, dyn_model, da
 
 def log_model_predictions(env, feature_size, encoder, dyn_model, 
                           data_statistics,  itr, cont=False, 
-                          horizon=20, k=12, log_dir='plot/'):
+                          horizon=20, k=8, log_dir='plot/'):
     # model predictions
     fig = plt.figure()
     

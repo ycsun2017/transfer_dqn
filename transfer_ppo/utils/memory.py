@@ -92,7 +92,7 @@ class ModelReplayBuffer:
         self.rewards = deque(maxlen = max_size)
         self.counter = 0
     
-    def store(self, obs, acs, n_obs, rewards, cont=False, noise=False):
+    def store(self, obs, acs, n_obs, rewards, cont=False, noise=True):
         if noise:
             if cont:
                 acs = add_noise(acs)
