@@ -8,18 +8,19 @@ from transfer_ppo.utils.ppo_core import *
 
 class PPO(nn.Module):
     def __init__(self, observation_space, action_space, feature_size, hidden_units=64, encoder_layers=2, 
-                 value_layers = 2, model_layers=1, clip_ratio=0.2, activation=nn.Tanh, 
+                 value_layers = 2, model_layers=1, policy_layers=0, clip_ratio=0.2, activation=nn.Tanh, 
                  gamma=0.99, lam = 0.97, device=torch.device("cpu"),
                 train_pi_iters=80, train_v_iters=80, train_dynamic_iters=5, target_kl=0.01,
                 transfer=False, no_detach=False, pi_lr=3e-4, vf_lr=1e-3, model_lr=1e-3, coeff=1.0, 
-                delta=True, obs_only=False, env=None):
+                delta=True, obs_only=False, env=None, disable_encoder=False):
         super(PPO, self).__init__()
         self.cont = isinstance(action_space, Box)
-        self.ac = MLPActorCritic(observation_space, action_space, policy_hidden_sizes=[hidden_units]*encoder_layers, 
-                                 value_hidden_sizes = [hidden_units]*value_layers,
+        self.ac = MLPActorCritic(observation_space, action_space, encoder_hidden_sizes=[hidden_units]*encoder_layers, 
+                                 value_hidden_sizes = [hidden_units]*value_layers, 
+                                 policy_layers = [hidden_units]*policy_layers,
                                  feature_size = feature_size, no_grad_encoder=(not no_detach), model_lr=model_lr, 
                                  model_hidden_sizes=[hidden_units]*model_layers, obs_only=obs_only,
-                                 env=env).to(Param.device)
+                                 env=env, disable_encoder=disable_encoder).to(Param.device)
         self.var_counts = tuple(count_vars(module) for module in [self.ac.pi, self.ac.v])
         self.transfer = transfer
         self.gamma = gamma

@@ -58,7 +58,7 @@ class Dynamic_Model(nn.Module):
             obs_normalized =  from_numpy((obs_unnormalized - data_statistics['obs_mean'])/data_statistics['obs_std'])
         else:
             obs_normalized = from_numpy(obs_unnormalized)
-        obs = encoder(obs_normalized).detach()
+        feature_vec = encoder(obs_normalized).detach()
         
         # normalize input action if action space is continuous
         if self.cont:
@@ -69,7 +69,7 @@ class Dynamic_Model(nn.Module):
         else:
             convert = lambda acs: torch.tensor(acs).to(Param.device).type(torch.int64)
             acs_normalized =  torch.nn.functional.one_hot(convert(acs_unnormalized), self.act_dim).float() 
-        concatenated_input = torch.cat([obs, acs_normalized], dim=1)
+        concatenated_input = torch.cat([feature_vec, acs_normalized], dim=1)
         if self.no_grad_encoder:
             concatenated_input.detach()
             
@@ -78,16 +78,16 @@ class Dynamic_Model(nn.Module):
         
         ### Convert the torch tensor to numpy array
         if self.delta:
-            next_obs_pred    = obs.cpu().detach().numpy() + delta_pred.cpu().detach().numpy()
+            next_obs_pred    = feature_vec.cpu().detach().numpy() + delta_pred.cpu().detach().numpy()
         else:
             next_obs_pred    = delta_pred.cpu().detach().numpy()
         
         if not self.obs_only:
             reward_pred = self.reward_network(concatenated_input)
             next_reward_pred = reward_pred.cpu().detach().numpy()
-            return next_obs_pred, next_reward_pred, reward_pred, delta_pred, obs
+            return next_obs_pred, next_reward_pred, reward_pred, delta_pred
         else:
-            return next_obs_pred, delta_pred, obs
+            return next_obs_pred, delta_pred
 
     ### Compute s_{t+1} and r_{t}
     def get_prediction(self, encoder, obs, acs, data_statistics):
@@ -112,13 +112,13 @@ class Dynamic_Model(nn.Module):
             delta_target = encoder(from_numpy(next_observations))
             
         if not self.obs_only:
-            _,_, reward_pred, delta_pred,_ = self.forward(encoder, observations, actions, data_statistics)
+            _,_, reward_pred, delta_pred  = self.forward(encoder, observations, actions, data_statistics)
             ### compute the loss of reward and transition models
             loss_obs    = self.loss(delta_pred, delta_target)
             loss_reward = self.loss(reward_pred, from_numpy(rewards).unsqueeze(1))
             return loss_reward, loss_obs
         else:
-            _,  delta_pred, _ = self.forward(encoder, observations, actions, data_statistics)
+            _,  delta_pred  = self.forward(encoder, observations, actions, data_statistics)
             loss_obs          = self.loss(delta_pred, delta_target)
             return loss_obs
     
@@ -151,11 +151,10 @@ def calculate_mean_prediction_error(env, encoder, action_sequence, dyn_model, da
     true_states, pred_states, obs = [], [], env.reset()
     for a in action_sequence:
         results = dyn_model(encoder, np.expand_dims(obs,axis=0), [a], data_statistics)
-        pred_state, true_state = results[0], results[-1]
-        true_state = true_state.cpu().numpy()
-        #pred_state = dyn_model(encoder, obs, a, data_statistics)[0]
-        pred_states.append(pred_state)
+        pred_state = results[0]
+        true_state == encoder(from_numpy(env.step(a))).cpu().numpy()
         true_states.append(true_state)
+        pred_states.append(pred_state)
         obs,_,_,_ = env.step(a)
         
     true_states = np.squeeze(true_states)

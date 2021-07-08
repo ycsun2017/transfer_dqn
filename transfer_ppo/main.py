@@ -46,12 +46,13 @@ def main(args):
     ### Create PPO agent
     agent = PPO(env.observation_space, env.action_space, args.feature_size, 
                 hidden_units=args.hidden_units, encoder_layers=args.encoder_layers, model_layers=args.model_layers,
-                value_layers=args.value_layers, clip_ratio=args.clip_ratio, 
+                value_layers=args.value_layers, policy_layers=args.policy_layers, clip_ratio=args.clip_ratio, 
                 device=args.device, train_pi_iters=args.train_pi_iters, 
                 train_v_iters=args.train_v_iters, train_dynamic_iters=args.train_dynamic_iters, 
                 target_kl=args.target_kl, transfer=args.transfer, no_detach=args.no_detach, 
                 pi_lr=args.pi_lr, vf_lr=args.vf_lr, model_lr=args.model_lr, 
-                coeff=args.coeff, delta=not args.no_delta, obs_only = args.obs_only, env=env)
+                coeff=args.coeff, delta=not args.no_delta, obs_only = args.obs_only, 
+                env=env, disable_encoder=args.disable_encoder)
     
     ### Create Two Buffers
     obs_dim   = env.observation_space.shape
@@ -219,9 +220,11 @@ parser.add_argument('--eval-trajectories', type=int, default=10)
 parser.add_argument('--seed', type=int, default=1)
 parser.add_argument('--coeff', type=float, default=5)
 
+parser.add_argument('--disable-encoder', action='store_true', default=False)
 parser.add_argument('--feature-size', type=int, default=64)
 parser.add_argument('--hidden-units', type=int, default=64)
 parser.add_argument('--encoder-layers', type=int, default=2)
+parser.add_argument('--policy-layers', type=int, default=0)
 parser.add_argument('--model-layers',  type=int, default=1)
 parser.add_argument('--value-layers', type=int, default=2)
 parser.add_argument('--no-delta', action='store_true', default=False, 
@@ -254,7 +257,7 @@ parser.add_argument('--lam', type=float, default=0.97)
 parser.add_argument('--target_kl', type=float, default=0.01)
 parser.add_argument('--train_pi_iters', type=int, default=80)
 parser.add_argument('--train_v_iters', type=int, default=80)
-parser.add_argument('--train_dynamic_iters', type=int, default=100)
+parser.add_argument('--train_dynamic_iters', type=int, default=200)
 args = parser.parse_args()
 main(args)
 

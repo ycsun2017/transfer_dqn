@@ -84,10 +84,14 @@ class LatentEncoder(nn.Module):
     
 class MLPCategoricalActor(Actor):
     
-    def __init__(self, obs_dim, act_dim, hidden_sizes, feature_size, activation):
+    def __init__(self, obs_dim, act_dim, hidden_sizes, feature_size, 
+                 activation, policy_layers=(), disable_encoder=False):
         super().__init__()
-        self.encoder = LatentEncoder(obs_dim, feature_size, hidden_sizes)
-        self.logits_net = mlp([feature_size, act_dim], nn.Tanh)
+        if disable_encoder:
+            self.encoder = lambda x: x
+        else:
+            self.encoder = LatentEncoder(obs_dim, feature_size, hidden_sizes)
+        self.logits_net = mlp([feature_size]+policy_layers+[act_dim], nn.Tanh)
     def _distribution(self, obs):
         latent_vec = self.encoder(obs)
         logits = self.logits_net(latent_vec)
@@ -99,12 +103,16 @@ class MLPCategoricalActor(Actor):
 
 class MLPGaussianActor(Actor):
 
-    def __init__(self, obs_dim, act_dim, hidden_sizes, feature_size, activation):
+    def __init__(self, obs_dim, act_dim, hidden_sizes, 
+                 feature_size, activation, policy_layers=(), disable_encoder=False):
         super().__init__()
         log_std = -0.5 * np.ones(act_dim, dtype=np.float32)
         self.log_std = torch.nn.Parameter(torch.as_tensor(log_std))
-        self.encoder = LatentEncoder(obs_dim, feature_size, hidden_sizes)
-        self.mu_net = mlp([feature_size, act_dim], nn.Tanh)
+        if disable_encoder:
+            self.encoder = lambda x: x
+        else:
+            self.encoder = LatentEncoder(obs_dim, feature_size, hidden_sizes)
+        self.mu_net = mlp([feature_size]+policy_layers+[act_dim], nn.Tanh)
 
     def _distribution(self, obs):
         latent_vec = self.encoder(obs)
@@ -129,7 +137,7 @@ class MLPCritic(nn.Module):
 ###
 ### Latent Encoder: 
 ### Input_dim:    obs_dim 
-### Hidden_sizes: policy_hidden_sizes (=[hidden_units]*encoder_layers in ppo.py, encoder_layers=2 by default)
+### Hidden_sizes: encoder_layers (=[hidden_units]*encoder_layers in ppo.py, encoder_layers=2 by default)
 ### Output_dim:   feature_size
 ###
 ### Reward & Transition Dynamics Model: 
@@ -139,7 +147,7 @@ class MLPCritic(nn.Module):
 ###
 ### Policy (Logits net):
 ### Input_dim:    feature_size
-### Hidden_sizes: None
+### Hidden_sizes: policy_layers
 ### Output_dim:   act_dim
 ###
 ### Value Function:
@@ -151,22 +159,29 @@ class MLPCritic(nn.Module):
 
 class MLPActorCritic(nn.Module):
     def __init__(self, observation_space, action_space, feature_size=128,
-                 policy_hidden_sizes=(64,64), value_hidden_sizes=(64,64), model_hidden_sizes=(), activation=nn.Tanh, 
-                 no_grad_encoder=True, model_lr=0.001, delta=True, obs_only=False, env=None):
+                 encoder_hidden_sizes=(64,64), value_hidden_sizes=(64,64), 
+                 model_hidden_sizes=(), policy_layers=(), activation=nn.Tanh, 
+                 no_grad_encoder=True, model_lr=0.001, delta=True, obs_only=False, env=None,
+                disable_encoder=False):
         super().__init__()
         
         obs_dim = observation_space.shape[0] 
         act_dim = action_space.shape[0] if isinstance(action_space, Box) else action_space.n
         
+        if disable_encoder: ### Since we don't have encoder, we will set obs_dim as feature size
+            feature_size = obs_dim
+        
         # policy builder depends on the type of action space
         if isinstance(action_space, Box):
-            self.pi = MLPGaussianActor(obs_dim, act_dim, policy_hidden_sizes, feature_size, activation)
+            self.pi = MLPGaussianActor(obs_dim, act_dim, encoder_hidden_sizes, 
+                                       feature_size, activation, policy_layers, disable_encoder)
             self.dynamic_model = Dynamic_Model(feature_size, act_dim, model_hidden_sizes, 
                                               cont=True, no_grad_encoder=no_grad_encoder, 
                                                lr=model_lr, delta=delta, obs_only=obs_only, env=env)
         else:
             assert isinstance(action_space, Discrete)
-            self.pi = MLPCategoricalActor(obs_dim, act_dim, policy_hidden_sizes, feature_size, activation)
+            self.pi = MLPCategoricalActor(obs_dim, act_dim, encoder_hidden_sizes, 
+                                          feature_size, activation, policy_layers, disable_encoder)
             self.dynamic_model = Dynamic_Model(feature_size, act_dim, model_hidden_sizes, 
                                               cont=False, no_grad_encoder=no_grad_encoder, 
                                                lr=model_lr, delta=delta, obs_only=obs_only, env=env)
