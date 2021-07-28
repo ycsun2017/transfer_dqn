@@ -83,7 +83,7 @@ class PPOBuffer:
 
 class ModelReplayBuffer:
     
-    def __init__(self, obs_dim, act_dim, max_size=100000):
+    def __init__(self, obs_dim, act_dim, max_size=500000):
 
         self.max_size = max_size
         self.obs     = deque(maxlen = max_size)
@@ -92,7 +92,7 @@ class ModelReplayBuffer:
         self.rewards = deque(maxlen = max_size)
         self.counter = 0
     
-    def store(self, obs, acs, n_obs, rewards, cont=False, noise=True):
+    def store(self, obs, acs, n_obs, rewards, cont=False, noise=False):
         if noise:
             if cont:
                 acs = add_noise(acs)
@@ -119,13 +119,13 @@ class ModelReplayBuffer:
         
     def sample(self, batch_size=256):
         idx = np.random.choice(min(self.counter, self.max_size), size=batch_size)
-        states, actions, nexts, rewards = [], [], [], []
+        states, actions, next_s, rewards = [], [], [], []
         for i in idx:
             states.append(self.obs[i])
             actions.append(self.acs[i])
-            nexts.append(self.n_obs[i])
+            next_s.append(self.n_obs[i])
             rewards.append(self.rewards[i])
-        return np.asarray(states), np.asarray(actions), np.asarray(nexts), np.asarray(rewards)
+        return np.asarray(states), np.asarray(actions), np.asarray(next_s), np.asarray(rewards)
     
     def __len__(self):
         return self.counter

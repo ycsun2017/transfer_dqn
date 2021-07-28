@@ -21,8 +21,8 @@ def mlp(sizes, activation, output_activation=nn.Identity):
 class Dynamic_Model(nn.Module):
 
     def __init__(self, feature_size, act_dim, hidden_sizes=(), lr=1e-5, 
-                 cont=False, normalize=True, no_grad_encoder=True,
-                 delta=True, obs_only=False, env=None):
+                 cont=False, normalize=True, no_grad_encoder=True, source_aux=False,
+                 delta=True, obs_only=False, env=None, act_encoder=False):
         super(Dynamic_Model, self).__init__()
         
         self.env = env
@@ -30,19 +30,6 @@ class Dynamic_Model(nn.Module):
         self.learning_rate = lr
         self.act_dim = act_dim
         self.feature_size = feature_size
-        self.delta_network = mlp([feature_size + act_dim] + hidden_sizes +[feature_size], nn.Tanh)
-        self.delta_network.to(Param.device)
-        self.delta_optimizer = Adam(
-            self.delta_network.parameters(),
-            self.learning_rate,
-        )
-        if not obs_only:
-            self.reward_network = mlp([feature_size + act_dim] + hidden_sizes +[1], nn.Tanh)
-            self.reward_network.to(Param.device)
-            self.reward_optimizer = Adam(
-                self.reward_network.parameters(),
-                self.learning_rate,
-            )
         self.loss = nn.MSELoss()
         ### If delta is true, only predict s_{t+1}-s_{t} instead of s_{t+1}
         self.delta = delta
@@ -50,14 +37,43 @@ class Dynamic_Model(nn.Module):
         self.normalize = normalize
         self.no_grad_encoder = no_grad_encoder
         self.obs_only = obs_only
+        self.source_aux = source_aux
+        self.act_encoder = act_encoder
+        
+        if act_encoder:
+            ### Use our two linear model
+            self.r_encoder = mlp([act_dim]+[hidden_sizes[0]]+[feature_size], nn.Tanh, output_activation=nn.Tanh).to(Param.device)
+            self.s_encoder = mlp([act_dim]+[hidden_sizes[0]]+[feature_size], nn.Tanh, output_activation=nn.Tanh).to(Param.device)
+            self.s_predict_net = mlp([feature_size, feature_size], nn.Identity).to(Param.device)
+            self.s_optimizer = Adam(
+                list(self.s_encoder.parameters())+
+                list(self.s_predict_net.parameters()),
+                self.learning_rate
+            )
+            self.r_optimizer = Adam(
+                self.r_encoder.parameters(),
+                self.learning_rate
+            )
+            
+        else:
+            self.delta_network = mlp([feature_size + act_dim] + hidden_sizes +[feature_size], nn.Tanh).to(Param.device)
+            self.s_optimizer = Adam(
+                self.delta_network.parameters(),
+                self.learning_rate
+            )
+            if not obs_only:
+                self.reward_network = mlp([feature_size + act_dim] + hidden_sizes +[1], nn.Tanh).to(Param.device)
+                self.r_optimizer = Adam(
+                    self.reward_network.parameters(),
+                    self.learning_rate
+                )
+            
         
             
-    def forward(self, encoder, obs_unnormalized, acs_unnormalized,
+    def forward(self, encoder, obs_normalized, acs_unnormalized,
                 data_statistics):
-        if self.normalize:
-            obs_normalized =  from_numpy((obs_unnormalized - data_statistics['obs_mean'])/data_statistics['obs_std'])
-        else:
-            obs_normalized = from_numpy(obs_unnormalized)
+        
+        obs_normalized = from_numpy(obs_normalized)
         feature_vec = encoder(obs_normalized).detach()
         
         # normalize input action if action space is continuous
@@ -69,12 +85,18 @@ class Dynamic_Model(nn.Module):
         else:
             convert = lambda acs: torch.tensor(acs).to(Param.device).type(torch.int64)
             acs_normalized =  torch.nn.functional.one_hot(convert(acs_unnormalized), self.act_dim).float() 
-        concatenated_input = torch.cat([feature_vec, acs_normalized], dim=1)
-        if self.no_grad_encoder:
-            concatenated_input.detach()
+        
+        ### compute next state prediction
+        if self.act_encoder:
+            s_act = self.s_encoder(obs_normalized)
+            delta_pred = self.s_predict_net(feature_vec*s_act)
+        else:
+            concatenated_input = torch.cat([feature_vec, acs_normalized], dim=1)
+            if self.no_grad_encoder and (not self.source_aux):
+                concatenated_input.detach()
             
-        # Unnormalize prediction
-        delta_pred  = self.delta_network(concatenated_input)
+            # Unnormalize prediction
+            delta_pred  = self.delta_network(concatenated_input)
         
         ### Convert the torch tensor to numpy array
         if self.delta:
@@ -83,93 +105,98 @@ class Dynamic_Model(nn.Module):
             next_obs_pred    = delta_pred.cpu().detach().numpy()
         
         if not self.obs_only:
-            reward_pred = self.reward_network(concatenated_input)
+            if self.act_encoder:
+                reward_pred =torch.sum(feature_vec*r_act, 1)
+            else:
+                reward_pred = self.reward_network(concatenated_input)
             next_reward_pred = reward_pred.cpu().detach().numpy()
             return next_obs_pred, next_reward_pred, reward_pred, delta_pred
         else:
             return next_obs_pred, delta_pred
-
-    ### Compute s_{t+1} and r_{t}
-    def get_prediction(self, encoder, obs, acs, data_statistics):
-        if not self.obs_only:
-            next_obs_pred, reward_pred, _,_ ,_ = self.forward(obs, acs, data_statistics)
-            return next_obs_pred, reward_pred
-        else:
-            next_obs_pred, _ ,_                = self.forward(obs, acs, data_statistics)
-            return next_obs_pred
     
     def compute_loss(self, encoder, data, data_statistics):
         observations, actions, next_observations, rewards = data
-        if self.normalize:
-            observations      = (observations - data_statistics['obs_mean'])/data_statistics['obs_std']
-            next_observations = (next_observations - data_statistics['obs_mean'])/data_statistics['obs_std']
         
+        ### Normalize the observation
+        observations_normalize      = (observations - data_statistics['obs_mean'])/(data_statistics['obs_std']+1e-6)
+        next_observations_normalize = (next_observations - data_statistics['obs_mean'])/(data_statistics['obs_std']+1e-6)
+        
+        ### Compute ground truth next state prediction
         if self.delta:
             ### Target delta: s_{t+1} - s_{t}
-            delta_target = (encoder(from_numpy(next_observations))-encoder(from_numpy(observations))).detach()
+            delta_target = (encoder(from_numpy(next_observations_normalize))-encoder(from_numpy(observations_normalize))).detach()
             ### Predicted delta
         else:
-            delta_target = encoder(from_numpy(next_observations))
-            
+            delta_target = encoder(from_numpy(next_observations_normalize))
+        
+        ### Predict next state (and reward if obs_only is False)
+        ### Compute the MSE prediction loss
         if not self.obs_only:
-            _,_, reward_pred, delta_pred  = self.forward(encoder, observations, actions, data_statistics)
+            _,_, reward_pred, delta_pred  = self.forward(encoder, observations_normalize, actions, data_statistics)
             ### compute the loss of reward and transition models
             loss_obs    = self.loss(delta_pred, delta_target)
             loss_reward = self.loss(reward_pred, from_numpy(rewards).unsqueeze(1))
             return loss_reward, loss_obs
         else:
-            _,  delta_pred  = self.forward(encoder, observations, actions, data_statistics)
+            _,  delta_pred  = self.forward(encoder, observations_normalize, actions, data_statistics)
             loss_obs          = self.loss(delta_pred, delta_target)
             return loss_obs
     
-    def update(self, encoder, data, data_statistics, train_dynamic_iters):
-        log_model_predictions(self.env, self.feature_size, encoder, self,
-                              data_statistics,  itr='{}_{}'.format(self.epoch, 0), 
-                              cont=self.cont, log_dir=Param.plot_dir)
+    def update(self, encoder, op_memory, data_statistics, train_dynamic_iters):
+        #log_model_predictions(self.env, self.feature_size, encoder, self,
+                              #data_statistics,  itr='{}_{}'.format(self.epoch, 0), 
+                              #cont=self.cont, log_dir=Param.plot_dir)
         for i in range(train_dynamic_iters):
+            data = op_memory.sample()
             if self.obs_only:
                 loss_obs = self.compute_loss(encoder, data, data_statistics)
             else:
                 loss_reward, loss_obs = self.compute_loss(encoder, data, data_statistics)
 
-            self.delta_optimizer.zero_grad() 
+            self.s_optimizer.zero_grad() 
             loss_obs.backward()
-            self.delta_optimizer.step()
+            self.s_optimizer.step()
             if not self.obs_only:
-                self.reward_optimizer.zero_grad() 
+                self.r_optimizer.zero_grad() 
                 loss_reward.backward()
-                self.reward_optimizer.step()
-        log_model_predictions(self.env, self.feature_size, encoder, self, 
-                              data_statistics, itr='{}_{}'.format(self.epoch, train_dynamic_iters), 
-                              cont=self.cont,  log_dir=Param.plot_dir)
-        self.epoch += 1
+                self.r_optimizer.step()
+        #log_model_predictions(self.env, self.feature_size, encoder, self, 
+                              #data_statistics, itr='{}_{}'.format(self.epoch, train_dynamic_iters), 
+                              #cont=self.cont,  log_dir=Param.plot_dir)
+        #self.epoch += 1
         return loss_obs.item() if self.obs_only else (loss_obs.item(), loss_reward.item())
-    
-    
     
 def calculate_mean_prediction_error(env, encoder, action_sequence, dyn_model, data_statistics):
     true_states, pred_states, obs = [], [], env.reset()
+    normalize  = lambda x: (x - data_statistics['obs_mean'])/(data_statistics['obs_std']+1e-6)
+    unnormalize  = lambda x: x*data_statistics['obs_std']+data_statistics['obs_mean']
+    obs_p = np.copy(obs)
+    for i in range(200):
+        low, high = env.action_space.low, env.action_space.high
+        obs, _, _, _ = env.step(np.random.uniform(low, high,(env.action_space.shape[0],)))
     for a in action_sequence:
-        results = dyn_model(encoder, np.expand_dims(obs,axis=0), [a], data_statistics)
-        pred_state = results[0]
-        normalize  = lambda x: (x - data_statistics['obs_mean'])/data_statistics['obs_std']
-        true_state = encoder(from_numpy(normalize(env.step(a)[0]))).cpu().numpy()
-        true_states.append(true_state)
-        pred_states.append(pred_state)
-        obs,_,_,_ = env.step(a)
+        true_states.append(obs_p)
+        obs_p,_,_,_ = env.step(a)
+    count = 0
+    for a in action_sequence:
+        pred_states.append(obs)
+        obs = dyn_model(encoder, np.expand_dims(normalize(obs),axis=0),  np.expand_dims(a,axis=0), data_statistics)[0]
+        obs = unnormalize(obs)
+        obs = np.squeeze(obs,axis=0)
+        count += 1
         
     true_states = np.squeeze(true_states)
     pred_states = np.squeeze(pred_states)
     
     # compute mean prediction error
-    mean_squared_error = lambda a, b: np.mean((a-b)**2)
-    mpe = mean_squared_error(pred_states, true_states)
+    loss = lambda a, b: np.mean((a-b)**2)
+    mpe = loss(pred_states, true_states)
     
     return mpe, true_states, pred_states
 
 def log_model_predictions(env, feature_size, encoder, dyn_model, 
                           data_statistics,  itr, cont=False, 
-                          horizon=20, k=8, log_dir='plot/'):
+                          horizon=20, k=14, log_dir='plot/'):
     # model predictions
     fig = plt.figure()
     
@@ -183,12 +210,15 @@ def log_model_predictions(env, feature_size, encoder, dyn_model,
     else:
         action_sequence = np.random.randint(act_dim, size=(horizon,))
     mpe, true_states, pred_states = calculate_mean_prediction_error(env, encoder, action_sequence, dyn_model, data_statistics)
-    dimensions = np.random.choice(feature_size, size=(k, ), replace=False)
 
     # plot the predictions
     fig.clf()
     counter = 1
+    obs_dim = 2*(obs_dim//2)
+    dimensions = np.random.choice(obs_dim, size=(k, ), replace=False)
+    #for i in range(obs_dim):
     for i in dimensions:
+        #plt.subplot(obs_dim/2, 2, counter)
         plt.subplot(k/2, 2, counter)
         counter += 1
         plt.plot(true_states[:,i], 'g')

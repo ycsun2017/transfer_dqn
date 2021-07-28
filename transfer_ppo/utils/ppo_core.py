@@ -77,10 +77,26 @@ class Actor(nn.Module):
 class LatentEncoder(nn.Module):
     def __init__(self, input_dim=8, feature_size=64, hidden_sizes=(64,64)):
         super().__init__()
+        self.feature_size = feature_size
         self.latent = mlp([input_dim]+hidden_sizes+[feature_size], activation=nn.Tanh, output_activation=nn.Identity)
+        self.normalize = None
+    
+    def set_normalize(self,  normalization_stat):
+        self.normalize = nn.BatchNorm1d(self.feature_size, affine=False).to(Param.device)
+        self.mean, self.std = normalization_stat 
+        print(self.mean.shape)
         
     def forward(self, x):
-        return self.latent(x)
+        #if x.dim() == 1:
+            #x = x.unsqueeze(0)
+            #self.eval()
+        if self.normalize is None:
+            return self.latent(x)
+        else:
+            #return self.normalize(self.latent(x))*self.std+self.mean
+            return self.latent(x)
+        #if x.dim() == 1:
+            #self.train()
     
 class MLPCategoricalActor(Actor):
     
@@ -107,7 +123,7 @@ class MLPGaussianActor(Actor):
                  feature_size, activation, policy_layers=(), disable_encoder=False):
         super().__init__()
         log_std = -0.5 * np.ones(act_dim, dtype=np.float32)
-        self.log_std = torch.nn.Parameter(torch.as_tensor(log_std))
+        self.log_std = nn.Parameter(torch.as_tensor(log_std))
         if disable_encoder:
             self.encoder = lambda x: x
         else:
@@ -162,7 +178,7 @@ class MLPActorCritic(nn.Module):
                  encoder_hidden_sizes=(64,64), value_hidden_sizes=(64,64), 
                  model_hidden_sizes=(), policy_layers=(), activation=nn.Tanh, 
                  no_grad_encoder=True, model_lr=0.001, delta=True, obs_only=False, env=None,
-                disable_encoder=False):
+                disable_encoder=False, source_aux=False, act_encoder=False):
         super().__init__()
         
         obs_dim = observation_space.shape[0] 
@@ -170,21 +186,24 @@ class MLPActorCritic(nn.Module):
         
         if disable_encoder: ### Since we don't have encoder, we will set obs_dim as feature size
             feature_size = obs_dim
-        
+            
         # policy builder depends on the type of action space
         if isinstance(action_space, Box):
             self.pi = MLPGaussianActor(obs_dim, act_dim, encoder_hidden_sizes, 
-                                       feature_size, activation, policy_layers, disable_encoder)
+                                       feature_size, activation, policy_layers, 
+                                       disable_encoder)
             self.dynamic_model = Dynamic_Model(feature_size, act_dim, model_hidden_sizes, 
                                               cont=True, no_grad_encoder=no_grad_encoder, 
-                                               lr=model_lr, delta=delta, obs_only=obs_only, env=env)
+                                               lr=model_lr, delta=delta, obs_only=obs_only, 
+                                               env=env, source_aux=source_aux, act_encoder=act_encoder)
         else:
             assert isinstance(action_space, Discrete)
             self.pi = MLPCategoricalActor(obs_dim, act_dim, encoder_hidden_sizes, 
                                           feature_size, activation, policy_layers, disable_encoder)
             self.dynamic_model = Dynamic_Model(feature_size, act_dim, model_hidden_sizes, 
                                               cont=False, no_grad_encoder=no_grad_encoder, 
-                                               lr=model_lr, delta=delta, obs_only=obs_only, env=env)
+                                               lr=model_lr, delta=delta, obs_only=obs_only, 
+                                               env=env, source_aux=source_aux, act_encoder=act_encoder)
         # build value function
         self.v  = MLPCritic(obs_dim, value_hidden_sizes, activation)
         
@@ -227,14 +246,17 @@ class MLPActorCritic(nn.Module):
         self.v.load_state_dict(checkpoint['value'])
         self.moving_mean = checkpoint['moving_mean']
         self.moving_std  = checkpoint['moving_std']
+        #self.pi.encoder.set_normalize((self.moving_mean, self.moving_std))
 
     
     ### Only load the dynamics, used when trained on target task
-    def load_dynamics(self, path):
-        print(self.dynamic_model)
+    def load_dynamics(self, path): 
         checkpoint = torch.load(path)
         print("load from ", path)
         self.dynamic_model.load_state_dict(checkpoint['model'])
+        self.moving_mean = checkpoint['moving_mean'].to(Param.device)
+        self.moving_std  = checkpoint['moving_std'].to(Param.device)
+        self.pi.encoder.set_normalize((self.moving_mean, self.moving_std))
         
     def normalize(self, obs):
         return (obs - self.moving_mean)/(self.moving_std+1e-6)
@@ -270,47 +292,3 @@ class MovingMeanStd:
     def std(self):
         return torch.sqrt(self.variance())
     
-def calculate_mean_prediction_error(env, encoder, action_sequence, dyn_model, data_statistics):
-    latent = lambda x: encoder(x).cpu().numpy() 
-    true_states, pred_states, obs = [], [],  latent(env.reset())
-    for a in action_sequence:
-        pred_state = dyn_model(encoder, obs, a, data_statistics)[0]
-        pred_states.append(pred_state)
-        true_state = latent(env.step(a)[0])
-        true_states.append(true_state)
-    true_states = np.squeeze(true_states)
-    pred_states = np.squeeze(pred_states)
-    
-    # compute mean prediction error
-    mean_squared_error = lambda a, b: np.mean((a-b)**2)
-    mpe = mean_squared_error(pred_states, true_states)
-    
-    return mpe, true_states, pred_states
-
-def log_model_predictions(env, encoder, dyn_model, 
-                          data_statistics,  itr, cont=False, 
-                          horizon=20, k=12, log_dir='./plot'):
-    # model predictions
-    fig = plt.figure()
-    
-    obs_dim = env.observation_space.shape[0]
-    act_dim = env.action_space.shape[0]
-
-    if cont:
-        # calculate and log model prediction error
-        low, high = env.action_space.low, env.action_space.high
-        action_sequence = np.random.uniform(low, high,(horizon, act_dim))
-    else:
-        action_sequence = np.random.randint(act_dim, size=(horizon,))
-    mpe, true_states, pred_states = calculate_mean_prediction_error(env, encoder, action_sequence, dyn_model, data_statistics)
-    dimensions = np.random.choice(obs_dim, size=(k, ))
-
-    # plot the predictions
-    fig.clf()
-    for i in dimensions:
-        plt.subplot(k/2, 2, i+1)
-        plt.plot(true_states[:,i], 'g')
-        plt.plot(pred_states[:,i], 'r')
-    fig.suptitle('MPE: ' + str(mpe))
-    figname = log_dir+'/itr_'+str(itr)+'_predictions.png' if itr is not None else log_dir + '/prediction{}.png'.format(horizon)
-    fig.savefig(figname, dpi=200, bbox_inches='tight')
