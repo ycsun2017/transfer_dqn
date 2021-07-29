@@ -186,6 +186,8 @@ def main(args):
             
             
     if not args.no_log:
+        print('Best Eval Reward:{}'.format(max_eval_reward))
+        logger_file.write('Best Eval Reward:{}'.format(max_eval_reward))
         logger_file.close()
         pickle.dump(epoch_reward, data_file)
         data_file.close()
