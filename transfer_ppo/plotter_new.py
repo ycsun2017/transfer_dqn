@@ -74,7 +74,7 @@ def get_args(cuda_id, seed, name, aux):
     parser.add_argument('--frame-stack', action='store_true', default=False)
     parser.add_argument('--reward-normalize', action='store_true', default=False)
     parser.add_argument('--exp-name', type=str, default="")
-    parser.add_argument('--epochs', type=int, default=10)
+    parser.add_argument('--epochs', type=int, default=1000)
     parser.add_argument('--max-ep-len', type=int, default=1000)
     parser.add_argument('--log-epochs', type=int, default=50)
     parser.add_argument('--steps-per-epoch', type=int, default=4000)
@@ -139,6 +139,6 @@ def get_args(cuda_id, seed, name, aux):
         args = parser.parse_args(["--device", "cuda:{}".format(cuda_id), "--env-name", 
                                  "{}".format(env_name), "--disable-encoder", 
                                   "--policy-layers","3", "--model-layers","3", 
-                                  "--seed", "{}".format(seed), "--no-log", "--verbose", "source-aux"])
+                                  "--seed", "{}".format(seed), "--no-log", "--verbose", "--source-aux"])
                               
     return args
