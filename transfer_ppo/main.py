@@ -42,7 +42,7 @@ def main(args):
     ### Set-up Random Seed
     torch.manual_seed(args.seed)
     env.seed(args.seed)
-    
+        
     ### Create PPO agent
     agent = PPO(env.observation_space, env.action_space, args.feature_size, 
                 hidden_units=args.hidden_units, encoder_layers=args.encoder_layers, model_layers=args.model_layers,
@@ -52,7 +52,7 @@ def main(args):
                 target_kl=args.target_kl, transfer=args.transfer, no_detach=args.no_detach, 
                 pi_lr=args.pi_lr, vf_lr=args.vf_lr, model_lr=args.model_lr, 
                 coeff=args.coeff, delta=not args.no_delta, obs_only = args.obs_only, 
-                env=env, disable_encoder=args.disable_encoder, source_aux=args.source_aux, act_encoder=args.act_encoder)
+                env=env, disable_encoder=args.disable_encoder, source_aux=args.source_aux, act_encoder=args.act_encoder, classifier=args.classifier)
     
     ### Create Two Buffers
     obs_dim   = env.observation_space.shape
@@ -63,7 +63,10 @@ def main(args):
     
     ### If it's the target environment, load the pretrained environment model
     if args.transfer:
-        agent.ac.load_dynamics(args.load_path)
+        if not args.classifier:
+            agent.ac.load_dynamics(args.load_path, args.classifier)
+        else:
+            agent.ac.load_models(args.load_path, args.classifier)
         if args.pretrain:
             agent.pretrain_env_model(env, num_t=100)
         
@@ -181,7 +184,12 @@ def main(args):
             logger_file.write("---------------Epoch: {}  Eval Reward:{}--------------\n".format(epoch, eval_return))
             if eval_return > max_eval_reward:
                 max_eval_reward = eval_return
-                agent.save(model_path)
+                if args.save_buffer:
+                    from_numpy = lambda x: torch.from_numpy(x).to(Param.device).type(Param.dtype)
+                    states_saved = agent.ac.pi.encoder(from_numpy(np.asarray(op_memory.obs)[-len(op_memory.obs)//10:])).to(Param.device).type(Param.dtype)
+                else:
+                    states_saved = None
+                agent.save(model_path, states_saved)
         
             
             
@@ -213,6 +221,7 @@ def main(args):
         plt.yticks(np.arange(0, 7001,1000))
         plt.savefig('./plot/ppo_{}_{}.png'.format(args.env_name, 'source' if not args.transfer else 'transfer'))
     
+        
     return smoothed_return, n_interactions
 
 if __name__ == '__main__':
@@ -245,6 +254,9 @@ if __name__ == '__main__':
     parser.add_argument('--source-aux', action='store_true', default=False)
     parser.add_argument('--pretrain', action='store_true', default=False)
 
+    parser.add_argument('--classifier', action='store_true', default=False)
+    parser.add_argument('--save-buffer', action='store_true', default=False)
+    
     parser.add_argument('--buffer-size', type=int, default=500000)
     parser.add_argument('--batch-size',  type=int, default=256)
     parser.add_argument('--transfer', action='store_true', default=False)

@@ -22,7 +22,8 @@ class Dynamic_Model(nn.Module):
 
     def __init__(self, feature_size, act_dim, hidden_sizes=(), lr=1e-5, 
                  cont=False, normalize=True, no_grad_encoder=True, source_aux=False,
-                 delta=True, obs_only=False, env=None, act_encoder=False, classifier = False):
+                 delta=True, obs_only=False, env=None, act_encoder=False,
+                 classifier=False, source_buffer=None):
         super(Dynamic_Model, self).__init__()
         
         self.env = env
@@ -30,7 +31,30 @@ class Dynamic_Model(nn.Module):
         self.learning_rate = lr
         self.act_dim = act_dim
         self.feature_size = feature_size
+        self.delta_network = mlp([feature_size + act_dim] + hidden_sizes +[feature_size], nn.Tanh)
+        self.delta_network.to(Param.device)
+        self.delta_optimizer = Adam(
+            self.delta_network.parameters(),
+            self.learning_rate,
+        )
+        if not obs_only:
+            self.reward_network = mlp([feature_size + act_dim] + hidden_sizes +[1], nn.Tanh)
+            self.reward_network.to(Param.device)
+            self.reward_optimizer = Adam(
+                self.reward_network.parameters(),
+                self.learning_rate,
+            )
         self.loss = nn.MSELoss()
+        self.classifier = None
+        if classifier:
+            self.classifier = mlp([feature_size]+hidden_sizes+[2], nn.Tanh)
+            self.classifier.to(Param.device)
+            self.classifier_optimizer = Adam(
+                self.classifier.parameters(),
+                self.learning_rate
+            )
+            self.source_buffer = source_buffer
+            
         ### If delta is true, only predict s_{t+1}-s_{t} instead of s_{t+1}
         self.delta = delta
         self.cont = cont 
@@ -39,44 +63,19 @@ class Dynamic_Model(nn.Module):
         self.obs_only = obs_only
         self.source_aux = source_aux
         self.act_encoder = act_encoder
-        
-        self.classifier = None
-        self.source_buffer = None
-        if classifier:
-            self.classifier = mlp([feature_size]+hidden_sizes+[2], nn.Tanh)
-            self.classifier.to(Param.device)
-            self.classifier_optimizer = Adam(
-                self.classifier.parameters(),
-                self.learning_rate
-            )
-            
         if act_encoder:
             ### Use our two linear model
-            self.r_encoder = mlp([act_dim]+[hidden_sizes[0]]+[feature_size], nn.Tanh, output_activation=nn.Tanh).to(Param.device)
-            self.s_encoder = mlp([act_dim]+[hidden_sizes[0]]+[feature_size], nn.Tanh, output_activation=nn.Tanh).to(Param.device)
-            self.s_predict_net = mlp([feature_size, feature_size], nn.Identity).to(Param.device)
-            self.s_optimizer = Adam(
-                list(self.s_encoder.parameters())+
-                list(self.s_predict_net.parameters()),
+            self.r_encoder = mlp([act_dim]+[hidden_sizes[0]]+[feature_size], nn.Tanh, output_activation=nn.Tanh)
+            self.s_encoder = mlp([act_dim]+[hidden_sizes[0]]+[feature_size], nn.Tanh, output_activation=nn.Tanh)
+            self.s_predict_net = mlp([feature_size, feature_size], nn.Identity)
+            self.r_predict_net = mlp([feature_size, 1], nn.Identity)
+            self.encoder_optimizer = Adam(
+                list(self.s_encoder.parameters()) + 
+                list(self.r_encoder.parameters()) +
+                list(self.s_predcit_net.parameters()) + 
+                list(self.r_predict_net.parameters()),
                 self.learning_rate
             )
-            self.r_optimizer = Adam(
-                self.r_encoder.parameters(),
-                self.learning_rate
-            )
-            
-        else:
-            self.delta_network = mlp([feature_size + act_dim] + hidden_sizes +[feature_size], nn.Tanh).to(Param.device)
-            self.s_optimizer = Adam(
-                self.delta_network.parameters(),
-                self.learning_rate
-            )
-            if not obs_only:
-                self.reward_network = mlp([feature_size + act_dim] + hidden_sizes +[1], nn.Tanh).to(Param.device)
-                self.r_optimizer = Adam(
-                    self.reward_network.parameters(),
-                    self.learning_rate
-                )
             
         
             
@@ -98,7 +97,8 @@ class Dynamic_Model(nn.Module):
         
         ### compute next state prediction
         if self.act_encoder:
-            s_act = self.s_encoder(acs_normalized)
+            r_act = self.r_encoder(acs_normalized)
+            s_act = self.s_encoder(s_encoder)
             delta_pred = self.s_predict_net(feature_vec*s_act)
         else:
             concatenated_input = torch.cat([feature_vec, acs_normalized], dim=1)
@@ -116,8 +116,7 @@ class Dynamic_Model(nn.Module):
         
         if not self.obs_only:
             if self.act_encoder:
-                r_act = self.r_encoder(acs_normalized)
-                reward_pred =torch.sum(feature_vec*r_act, 1, keepdim=True)
+                reward_pred = self.r_predict_net(feature_vec*r_act)
             else:
                 reward_pred = self.reward_network(concatenated_input)
             next_reward_pred = reward_pred.cpu().detach().numpy()
@@ -128,10 +127,7 @@ class Dynamic_Model(nn.Module):
     def compute_loss(self, encoder, data, data_statistics):
         observations, actions, next_observations, rewards = data
         
-        if self.classifier is not None:
-            target_encoding = encoder(from_numpy(observations))
-            source_encoding = self.source_buffer.sample(observations.shape[0])
-            loss_classifier = self.classifier_loss(source_encoding, target_encoding)
+        if self.classifier
         
         ### Normalize the observation
         observations_normalize      = (observations - data_statistics['obs_mean'])/(data_statistics['obs_std']+1e-6)
@@ -152,19 +148,14 @@ class Dynamic_Model(nn.Module):
             ### compute the loss of reward and transition models
             loss_obs    = self.loss(delta_pred, delta_target)
             loss_reward = self.loss(reward_pred, from_numpy(rewards).unsqueeze(1))
-            if self.classifier is not None:
-                return loss_reward, loss_obs, loss_classifier
-            else:
-                return loss_reward, loss_obs
-            
+            return loss_reward, loss_obs    
         else:
             _,  delta_pred  = self.forward(encoder, observations_normalize, actions, data_statistics)
             loss_obs          = self.loss(delta_pred, delta_target)
-            if self.classifier is not None:
-                return loss_obs, loss_classifier
-            else:
-                return loss_obs
-    
+            return loss_obs
+        
+        
+        
     def update(self, encoder, op_memory, data_statistics, train_dynamic_iters):
         #log_model_predictions(self.env, self.feature_size, encoder, self,
                               #data_statistics,  itr='{}_{}'.format(self.epoch, 0), 
@@ -176,30 +167,34 @@ class Dynamic_Model(nn.Module):
             else:
                 loss_reward, loss_obs = self.compute_loss(encoder, data, data_statistics)
 
-            self.s_optimizer.zero_grad() 
+            self.delta_optimizer.zero_grad() 
             loss_obs.backward()
-            self.s_optimizer.step()
+            self.delta_optimizer.step()
             if not self.obs_only:
-                self.r_optimizer.zero_grad() 
+                self.reward_optimizer.zero_grad() 
                 loss_reward.backward()
-                self.r_optimizer.step()
+                self.reward_optimizer.step()
+                
         #log_model_predictions(self.env, self.feature_size, encoder, self, 
                               #data_statistics, itr='{}_{}'.format(self.epoch, train_dynamic_iters), 
                               #cont=self.cont,  log_dir=Param.plot_dir)
         #self.epoch += 1
         return loss_obs.item() if self.obs_only else (loss_obs.item(), loss_reward.item())
     
-    def update_classifier(self, encoder, target_memory, 
-                         batch_size=128, train_iter=100):
+    def train_classifier(self, encoder, source_memory, target_memory, 
+                         batch_size=64, train_iter=100):
         loss_fn, loss = torch.nn.CrossEntropyLoss(), None
         for i in range(train_iter):
-            source_batch = self.source_buffer.sample(batch_size//2)
-            target_batch = encoder(from_numpy(target_memory.sample(batch_size//2)[0]))
-            train_batch  = torch.vstack((source_batch, target_batch)).to(Param.device)
+            source_batch = source_memory.sample(batch_size/2)
+            target_batch = to_numpy(target_memory.sample(batch_size/2)[0])
+            train_batch  = torch.vstack((source_batch, target_batch)
             shuffle      = torch.randperm(batch_size)
             train_batch  = train_batch[shuffle]
-            train_label  = torch.hstack((torch.zeros(batch_size//2), torch.ones(batch_size//2))).long()[shuffle].to(Param.device) 
-            loss         = loss_fn(self.classifier(train_batch), train_label)
+            train_label  = torch.hstack((torch.zeros(batch_size/2),
+                                       torch.ones(batch_size/2))[shuffle]
+                                        
+            loss         = loss_fn(self.classifier_network(train_batch),
+                                   train_label)
             
             self.classifier_optimizer.zero_grad()
             loss.backward()
@@ -209,14 +204,15 @@ class Dynamic_Model(nn.Module):
     def classifier_loss(self, source_encoding, target_encoding):
         loss_fn = torch.nn.CrossEntropyLoss()
         label   = torch.hstack((torch.zeros(source_encoding.shape[0]),
-                                torch.ones(target_encoding.shape[0])
-                        )).long().to(Param.device)
-        batch   = torch.vstack((source_encoding, target_encoding))
-        logits  = self.classifier(batch)
-        return loss_fn(logits, label)
+                                torch.ones(target_encoding..shape[1])
+                        ))
+        batch   = torch.vstack(source_encoding, target_encoding)
+        logits  = self.classifier_network(batch)
+        return loss_fn(logits, batch)
     
-    
-    
+            
+            
+        
     
 def calculate_mean_prediction_error(env, encoder, action_sequence, dyn_model, data_statistics):
     true_states, pred_states, obs = [], [], env.reset()

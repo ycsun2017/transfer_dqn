@@ -13,7 +13,7 @@ class PPO(nn.Module):
                  gamma=0.99, lam = 0.97, device=torch.device("cpu"),
                 train_pi_iters=80, train_v_iters=80, train_dynamic_iters=5, target_kl=0.01,
                 transfer=False, no_detach=False, pi_lr=3e-4, vf_lr=1e-3, model_lr=1e-3, coeff=1.0, 
-                delta=True, obs_only=False, env=None, disable_encoder=False, source_aux=False, act_encoder=False):
+                delta=True, obs_only=False, env=None, disable_encoder=False, source_aux=False, act_encoder=False, classifier=False):
         super(PPO, self).__init__()
         self.cont = isinstance(action_space, Box)
         self.ac = MLPActorCritic(observation_space, action_space, encoder_hidden_sizes=[hidden_units]*encoder_layers, 
@@ -21,7 +21,7 @@ class PPO(nn.Module):
                                  policy_layers = [hidden_units]*policy_layers,
                                  feature_size = feature_size, no_grad_encoder=(not no_detach), model_lr=model_lr, 
                                  model_hidden_sizes=[hidden_units]*model_layers, obs_only=obs_only,
-                                 env=env, disable_encoder=disable_encoder, source_aux=source_aux, act_encoder=act_encoder).to(Param.device)
+                                 env=env, disable_encoder=disable_encoder, source_aux=source_aux, act_encoder=act_encoder, classifier=classifier).to(Param.device)
         self.var_counts = tuple(count_vars(module) for module in [self.ac.pi, self.ac.v])
         self.feature_size = feature_size
         self.transfer = transfer
@@ -37,6 +37,7 @@ class PPO(nn.Module):
         self.coeff = coeff
         self.obs_only = obs_only
         self.source_aux = source_aux
+        self.classifier = classifier
         
     def compute_loss_pi(self, data):
         obs, act, adv, logp_old = data['obs'], data['act'], data['adv'], data['logp']
@@ -62,7 +63,7 @@ class PPO(nn.Module):
         return ((self.ac.v(obs) - ret)**2).mean()
         
     ### Update Policy Network
-    ### If transfer or source_aux is True, the loss is compputed by
+    ### If transfer or source_aux is True, the loss is computed by
     ### policy_loss + self.coeff * (reward_loss+obs_loss)
     def update_policy(self, data, transfer=False, source_aux=False, op_memory=None):
         pi_l_old, pi_info_old, act_info = self.compute_loss_pi(data)
@@ -81,12 +82,21 @@ class PPO(nn.Module):
             else:
                 print('hello')
                 batch, data_statistics = op_memory.sample(), op_memory.get_statistics(cont=self.cont)
-                if self.obs_only:
-                    loss_obs = self.ac.dynamic_model.compute_loss(self.ac.pi.encoder, batch, data_statistics)
-                    loss = loss_pi + self.coeff*loss_obs
+                if self.classifier:
+                    if self.obs_only:
+                        loss_obs, loss_classifier = self.ac.dynamic_model.compute_loss(self.ac.pi.encoder, batch, data_statistics)
+                        loss = loss_pi + self.coeff*(loss_obs+loss_classifier)
+                    else:
+                        loss_reward, loss_obs, loss_classifier = self.ac.dynamic_model.compute_loss(self.ac.pi.encoder, batch, data_statistics)
+                        loss = loss_pi + self.coeff*(loss_reward+loss_obs+loss_classifier)
                 else:
-                    loss_reward, loss_obs = self.ac.dynamic_model.compute_loss(self.ac.pi.encoder, batch, data_statistics)
-                    loss = loss_pi + self.coeff*(loss_reward+loss_obs)
+                    if self.obs_only:
+                        loss_obs = self.ac.dynamic_model.compute_loss(self.ac.pi.encoder, batch, data_statistics)
+                        loss = loss_pi + self.coeff*loss_obs
+                    else:
+                        loss_reward, loss_obs = self.ac.dynamic_model.compute_loss(self.ac.pi.encoder, batch, data_statistics)
+                        loss = loss_pi + self.coeff*(loss_reward+loss_obs)
+                    
                 loss.backward()
             self.pi_optimizer.step()
         stop_iter = i
@@ -109,8 +119,12 @@ class PPO(nn.Module):
             
             
     def update(self, memory, op_memory):
-        data = memory.get()
         
+        ### update the classifier is set to be True
+        if self.classifier:
+            self.ac.dynamic_model.update_classifier(self.ac.pi.encoder, op_memory)
+        
+        data = memory.get()
         if (not self.transfer) or (not self.source_aux):
             pi_info = self.update_policy(data, transfer=False, source_aux=False)  ### Source Task
         else:
@@ -123,29 +137,33 @@ class PPO(nn.Module):
         if not self.transfer:
             ### Source Task, update environment models
             if not self.obs_only:
-                loss_obs, loss_reward = self.ac.dynamic_model.update(self.ac.pi.encoder, op_memory, data_statistics, self.train_dynamic_iters)
+                results = self.ac.dynamic_model.update(self.ac.pi.encoder, op_memory, data_statistics, self.train_dynamic_iters)
+                loss_obs, loss_reward = results[0], results[1]
                 return pi_info, v_info, loss_obs, loss_reward
             else:
-                loss_obs = self.ac.dynamic_model.update(self.ac.pi.encoder, op_memory, data_statistics, self.train_dynamic_iters)
+                results = self.ac.dynamic_model.update(self.ac.pi.encoder, op_memory, data_statistics, self.train_dynamic_iters)
+                loss_obs = results[0]
                 return pi_info, v_info, loss_obs
         else:
             data = op_memory.sample()
             ### Target Task, only compute the loss without doing any updates
             if not self.obs_only:
-                loss_obs, loss_reward = self.ac.dynamic_model.compute_loss(self.ac.pi.encoder, data, data_statistics)
+                results = self.ac.dynamic_model.compute_loss(self.ac.pi.encoder, data, data_statistics)
+                loss_obs, loss_reward = results[0], results[1]
                 return pi_info, v_info, loss_obs, loss_reward
             else:
-                loss_obs = self.ac.dynamic_model.compute_loss(self.ac.pi.encoder, data, data_statistics)
+                results  = self.ac.dynamic_model.compute_loss(self.ac.pi.encoder, data, data_statistics)
+                loss_obs = results[0]
                 return pi_info, v_info, loss_obs
             
-    def save(self, path):
-        self.ac.save(path)
+    def save(self, path, buffer=None):
+        self.ac.save(path, buffer=buffer)
         
-    def load_models(self, path):
-        self.ac.load_models(path)
+    def load_models(self, path, load_buffer=False):
+        self.ac.load_models(path, load_buffer=load_buffer)
             
-    def load_dynamics(self, path):
-        self.ac.load_dynamics(path)
+    def load_dynamics(self, path, load_buffer=False):
+        self.ac.load_dynamics(path, load_buffer=load_buffer)
         
     def step(self, obs):
         return self.ac.step(obs)

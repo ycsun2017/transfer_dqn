@@ -84,7 +84,6 @@ class LatentEncoder(nn.Module):
     def set_normalize(self,  normalization_stat):
         self.normalize = nn.BatchNorm1d(self.feature_size, affine=False).to(Param.device)
         self.mean, self.std = normalization_stat 
-        print(self.mean.shape)
         
     def forward(self, x):
         #if x.dim() == 1:
@@ -178,7 +177,8 @@ class MLPActorCritic(nn.Module):
                  encoder_hidden_sizes=(64,64), value_hidden_sizes=(64,64), 
                  model_hidden_sizes=(), policy_layers=(), activation=nn.Tanh, 
                  no_grad_encoder=True, model_lr=0.001, delta=True, obs_only=False, env=None,
-                disable_encoder=False, source_aux=False, act_encoder=False):
+                disable_encoder=False, source_aux=False, act_encoder=False,
+                classifier=False):
         super().__init__()
         
         obs_dim = observation_space.shape[0] 
@@ -195,7 +195,7 @@ class MLPActorCritic(nn.Module):
             self.dynamic_model = Dynamic_Model(feature_size, act_dim, model_hidden_sizes, 
                                               cont=True, no_grad_encoder=no_grad_encoder, 
                                                lr=model_lr, delta=delta, obs_only=obs_only, 
-                                               env=env, source_aux=source_aux, act_encoder=act_encoder)
+                                               env=env, source_aux=source_aux, act_encoder=act_encoder, classifier=classifier)
         else:
             assert isinstance(action_space, Discrete)
             self.pi = MLPCategoricalActor(obs_dim, act_dim, encoder_hidden_sizes, 
@@ -203,7 +203,7 @@ class MLPActorCritic(nn.Module):
             self.dynamic_model = Dynamic_Model(feature_size, act_dim, model_hidden_sizes, 
                                               cont=False, no_grad_encoder=no_grad_encoder, 
                                                lr=model_lr, delta=delta, obs_only=obs_only, 
-                                               env=env, source_aux=source_aux, act_encoder=act_encoder)
+                                               env=env, source_aux=source_aux, act_encoder=act_encoder, classifier=classifier)
         # build value function
         self.v  = MLPCritic(obs_dim, value_hidden_sizes, activation)
         
@@ -229,34 +229,40 @@ class MLPActorCritic(nn.Module):
     def act(self, obs, normalize=True):
         return self.step(obs, normalize, train=False)[0]
         
-    def save(self, path): 
+    def save(self, path, buffer=None): 
         state_dict = {
-            'policy': self.pi.state_dict(),
+            'policy': self.pi.mu_net.state_dict(),
             'value':  self.v.state_dict(),
             'model': self.dynamic_model.state_dict(),
             'moving_mean': self.moving_mean,
             'moving_std': self.moving_std
             }
+        if buffer is not None:
+            state_dict['buffer']=buffer
         torch.save(state_dict, path)
 
-    def load_models(self, path):
+    def load_models(self, path, load_buffer=False):
         checkpoint = torch.load(path)
         print("load from ", path)
-        self.pi.load_state_dict(checkpoint['policy'])
-        self.v.load_state_dict(checkpoint['value'])
+        self.pi.mu_net.load_state_dict(checkpoint['policy'])
+        #self.v.load_state_dict(checkpoint['value'])
         self.moving_mean = checkpoint['moving_mean']
         self.moving_std  = checkpoint['moving_std']
+        if load_buffer:
+            self.dynamic_model.source_buffer = Classifier_Replay_Buffer(checkpoint['buffer'])
         #self.pi.encoder.set_normalize((self.moving_mean, self.moving_std))
 
     
     ### Only load the dynamics, used when trained on target task
-    def load_dynamics(self, path): 
+    def load_dynamics(self, path, load_buffer=False): 
         checkpoint = torch.load(path)
         print("load from ", path)
         self.dynamic_model.load_state_dict(checkpoint['model'])
         self.moving_mean = checkpoint['moving_mean'].to(Param.device)
         self.moving_std  = checkpoint['moving_std'].to(Param.device)
-        self.pi.encoder.set_normalize((self.moving_mean, self.moving_std))
+        if load_buffer:
+            self.dynamic_model.source_buffer = Classifier_Replay_Buffer(checkpoint['buffer'])
+        #self.pi.encoder.set_normalize((self.moving_mean, self.moving_std))
         
     def normalize(self, obs):
         return (obs - self.moving_mean)/(self.moving_std+1e-6)
@@ -291,4 +297,17 @@ class MovingMeanStd:
         
     def std(self):
         return torch.sqrt(self.variance())
+
+class Classifier_Replay_Buffer:
     
+    ### Store a pool of encoded source states
+    def __init__(self, encoding_buffer):
+        self.encoding_buffer = encoding_buffer
+        
+    def sample(self, batch_size):
+        index = np.random.choice(self.encoding_buffer.shape[0], 
+                                 batch_size, replace=False)
+        return self.encoding_buffer[index]
+    
+    def __len__(self):
+        return self.encoding_buffer.shape[0]

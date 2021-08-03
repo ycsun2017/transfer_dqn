@@ -118,7 +118,8 @@ class ModelReplayBuffer:
             })
         
     def sample(self, batch_size=256):
-        idx = np.random.choice(min(self.counter, self.max_size), size=batch_size)
+        idx = np.random.choice(min(self.counter, self.max_size), 
+                               size=batch_size, replace=False)
         states, actions, next_s, rewards = [], [], [], []
         for i in idx:
             states.append(self.obs[i])
