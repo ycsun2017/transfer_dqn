@@ -81,21 +81,10 @@ class LatentEncoder(nn.Module):
         self.latent = mlp([input_dim]+hidden_sizes+[feature_size], activation=nn.Tanh, output_activation=nn.Identity)
         self.normalize = None
     
-    def set_normalize(self,  normalization_stat):
-        self.normalize = nn.BatchNorm1d(self.feature_size, affine=False).to(Param.device)
-        self.mean, self.std = normalization_stat 
         
     def forward(self, x):
-        #if x.dim() == 1:
-            #x = x.unsqueeze(0)
-            #self.eval()
-        if self.normalize is None:
-            return self.latent(x)
-        else:
-            #return self.normalize(self.latent(x))*self.std+self.mean
-            return self.latent(x)
-        #if x.dim() == 1:
-            #self.train()
+        latent_vec = self.latent(x)
+        return latent_vec/torch.linalg.norm(latent_vec, dim=-1).unsqueeze(-1)
     
 class MLPCategoricalActor(Actor):
     

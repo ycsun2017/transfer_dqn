@@ -60,15 +60,6 @@ def main(args):
     cont      = True if isinstance(env.action_space, Box) else False
     memory    = PPOBuffer(obs_dim, act_dim, args.steps_per_epoch, args.gamma, args.lam)
     op_memory = ModelReplayBuffer(obs_dim, act_dim)
-    
-    ### If it's the target environment, load the pretrained environment model
-    if args.transfer:
-        if not args.classifier:
-            agent.ac.load_dynamics(args.load_path, args.classifier)
-        else:
-            agent.ac.load_models(args.load_path, args.classifier)
-        if args.pretrain:
-            agent.pretrain_env_model(env, num_t=100)
         
     if not args.no_log:
         ### Set up logging path
@@ -86,6 +77,16 @@ def main(args):
         logger_file.write('--------------------\nNumber of parameters: \t pi: %d, \t v: %d\n------------------'%agent.var_counts)
         logger_file.write(str(agent))
         logger_file.flush()
+        Param.logger_file = logger_file
+    
+    ### Load the pretrained environment models
+    if args.transfer:
+        if not args.classifier:
+            agent.ac.load_dynamics(args.load_path, args.classifier)
+        else:
+            agent.ac.load_models(args.load_path, args.classifier)
+        if args.pretrain:
+            agent.pretrain_env_model(env, num_t=20)
     
     epoch_reward, max_eval_reward = [], -np.inf
     o, next_o = env.reset(), None

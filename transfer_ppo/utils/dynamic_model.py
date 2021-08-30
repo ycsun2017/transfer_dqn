@@ -4,6 +4,7 @@ from torch.optim import Adam
 import numpy as np
 from transfer_ppo.utils.param import  Param
 import matplotlib.pyplot as plt
+from sklearn.manifold import TSNE
 
 def from_numpy(n_array, dtype=None):
     if dtype is None:
@@ -43,7 +44,7 @@ class Dynamic_Model(nn.Module):
         self.classifier = None
         self.source_buffer = None
         if classifier:
-            self.classifier = mlp([feature_size]+hidden_sizes+[2], nn.Tanh)
+            self.classifier = mlp([feature_size]+[32, 2], nn.Tanh)
             self.classifier.to(Param.device)
             self.classifier_optimizer = Adam(
                 self.classifier.parameters(),
@@ -128,10 +129,11 @@ class Dynamic_Model(nn.Module):
     def compute_loss(self, encoder, data, data_statistics):
         observations, actions, next_observations, rewards = data
         
+        ### Compute Classifier loss is needed 
         if self.classifier is not None:
-            target_encoding = encoder(from_numpy(observations))
-            source_encoding = self.source_buffer.sample(observations.shape[0])
-            loss_classifier = self.classifier_loss(source_encoding, target_encoding)
+            target_encoding   = encoder(from_numpy(observations))
+            source_encoding   = self.source_buffer.sample(observations.shape[0]).to(Param.device)
+            loss_classifier   = self.classifier_loss(source_encoding, target_encoding)
         
         ### Normalize the observation
         observations_normalize      = (observations - data_statistics['obs_mean'])/(data_statistics['obs_std']+1e-6)
@@ -153,7 +155,7 @@ class Dynamic_Model(nn.Module):
             loss_obs    = self.loss(delta_pred, delta_target)
             loss_reward = self.loss(reward_pred, from_numpy(rewards).unsqueeze(1))
             if self.classifier is not None:
-                return loss_reward, loss_obs, loss_classifier
+                return loss_reward, loss_obs, -loss_classifier
             else:
                 return loss_reward, loss_obs
             
@@ -161,9 +163,41 @@ class Dynamic_Model(nn.Module):
             _,  delta_pred  = self.forward(encoder, observations_normalize, actions, data_statistics)
             loss_obs          = self.loss(delta_pred, delta_target)
             if self.classifier is not None:
-                return loss_obs, loss_classifier
+                return loss_obs, -loss_classifier
             else:
                 return loss_obs
+
+            
+            
+    def pretrian_loss(self, source_encoder,    target_encoder, 
+                            source_data,       target_data, 
+                            source_statistics, target_statistics, 
+                            encoder_optimizer, alpha=1.0):
+        s_observations, s_actions, s_rewards = source_data
+        t_observations, t_actions, t_rewards = tartet_data
+    
+        ### Normalize the observation and action
+        s_observations_normalize      = (s_observations - source_statistics['obs_mean'])/(source_statistics['obs_std']+1e-6)
+        t_observations_normalize      = (t_observations - target_statistics['obs_mean'])/(target_statistics['obs_std']+1e-6)
+        s_actions_normalize           = (s_actions - source_statistics['acs_mean'])/(source_statistics['acs_std']+1e-6)
+        t_actions_normalize           = (t_actions - target_statistics['acs_mean'])/(target_statistics['acs_std']+1e-6)
+        
+        ### Compute state-action encoding
+        s_encoder, a_encoder = source_encoder
+        source_encoding      = s_encoder(from_numpy(s_observations_normalize))*a_encoder(from_numpy(s_actions_normalize)) 
+        target_encoding      = target_encoder(from_numpy(t_observations_normalize))*self.r_encoder(from_numpy(s_actions_normalize)) 
+        
+        weight = torch.exp(-alpha*torch.abs(from_numpy(s_rewards-t_rewards))).unsqueeze(-1)
+        loss = torch.nn.MSELoss((weight*source_encoding.T).T-(weight*target_encoding.T).T)
+        
+        self.r_optimizer.zero_grad()
+        encoder_optimizer.zero_grad()
+        loss.backward()
+        self.r_optimizer.backward()
+        self.encoder_optimizer.backward()
+        
+        return loss
+        
     
     def update(self, encoder, op_memory, data_statistics, train_dynamic_iters):
         #log_model_predictions(self.env, self.feature_size, encoder, self,
@@ -190,20 +224,67 @@ class Dynamic_Model(nn.Module):
         return loss_obs.item() if self.obs_only else (loss_obs.item(), loss_reward.item())
     
     def update_classifier(self, encoder, target_memory, 
-                         batch_size=128, train_iter=100):
+                          batch_size=512, train_iter=100, target_data=None):
         loss_fn, loss = torch.nn.CrossEntropyLoss(), None
+        
+        with torch.no_grad():
+            ###########
+            if target_data is None:
+                source_batch = self.source_buffer.sample(batch_size//2).to(Param.device)
+                target_batch = encoder(from_numpy(target_memory.sample(batch_size//2)[0]))
+                train_label  = torch.hstack((torch.zeros(batch_size//2), 
+                                             torch.ones(batch_size//2))).long().to(Param.device) 
+            else:
+                source_batch   = self.source_buffer.sample(target_data[0].shape[0]).to(Param.device)
+                target_batch   = encoder(from_numpy(target_data[0]))
+                train_label  = torch.hstack((torch.zeros(target_data[0].shape[0]), 
+                                             torch.ones(target_data[0].shape[0]))).long().to(Param.device) 
+
+            train_batch  = torch.vstack((source_batch, target_batch))
+            logits       = self.classifier(train_batch.to(Param.device))
+            predict      = torch.argmax(logits, axis=1)
+            self.classifier_accuracy     = torch.sum(predict==train_label)/train_label.shape[0]
+            if Param.logger_file is not None:
+                print('Classifier Accuraccy Before Trainig:{}'.format(self.classifier_accuracy))
+                Param.logger_file.write('Classifier Accuraccy Before Trainig:{}\n'.format(self.classifier_accuracy))
+
+            tsne = TSNE(n_components=2, random_state=0)
+            batch_2d = tsne.fit_transform(train_batch.detach().cpu())
+            plt.figure(figsize=(6, 5))
+            plt.scatter(batch_2d[:train_batch.shape[0]//2,0], batch_2d[:train_batch.shape[0]//2,1], c='g', label='source encoding')
+            plt.scatter(batch_2d[train_batch.shape[0]//2:,0], batch_2d[train_batch.shape[0]//2:,1], c='r', label='target encoding')
+            plt.legend()
+            plt.savefig("Scatter.png") 
+            plt.close()
+            ###########
+        
         for i in range(train_iter):
-            source_batch = self.source_buffer.sample(batch_size//2)
-            target_batch = encoder(from_numpy(target_memory.sample(batch_size//2)[0]))
+            if target_data is not None:
+                batch = np.random.randint(len(target_data))
+            shuffle      = torch.randperm(batch_size if target_data is None else target_data[batch].shape[0]*2)
+            if target_data is None:
+                source_batch = self.source_buffer.sample(batch_size//2).to(Param.device)
+                target_batch = encoder(from_numpy(target_memory.sample(batch_size//2)[0]))
+                train_label  = torch.hstack((torch.zeros(batch_size//2), 
+                                             torch.ones(batch_size//2))).long()[shuffle].to(Param.device) 
+            else:
+                source_batch   = self.source_buffer.sample(target_data[batch].shape[0]).to(Param.device)
+                target_batch   = encoder(from_numpy(target_data[batch]))
+                train_label    = torch.hstack((torch.zeros(target_data[batch].shape[0]), 
+                                             torch.ones(target_data[batch].shape[0]))).long()[shuffle].to(Param.device) 
             train_batch  = torch.vstack((source_batch, target_batch)).to(Param.device)
-            shuffle      = torch.randperm(batch_size)
             train_batch  = train_batch[shuffle]
-            train_label  = torch.hstack((torch.zeros(batch_size//2), torch.ones(batch_size//2))).long()[shuffle].to(Param.device) 
-            loss         = loss_fn(self.classifier(train_batch), train_label)
-            
+            logits       = self.classifier(train_batch)
+            loss         = loss_fn(logits, train_label)
+            ### Predict labels
+            predict      = torch.argmax(logits, axis=1)
+            self.classifier_accuracy     = torch.sum(predict==train_label)/train_label.shape[0]
             self.classifier_optimizer.zero_grad()
             loss.backward()
             self.classifier_optimizer.step()
+        if Param.logger_file is not None:
+            print('Classifier Accuraccy After Trainig:{}'.format(self.classifier_accuracy))
+            Param.logger_file.write('Classifier Accuraccy After Trainig:{}\n'.format(self.classifier_accuracy))
         return loss
     
     def classifier_loss(self, source_encoding, target_encoding):
@@ -213,6 +294,8 @@ class Dynamic_Model(nn.Module):
                         )).long().to(Param.device)
         batch   = torch.vstack((source_encoding, target_encoding))
         logits  = self.classifier(batch)
+        predict = torch.argmax(logits, axis=1) 
+        self.classifier_accuracy    = torch.sum(predict==label)/(label.shape[0])
         return loss_fn(logits, label)
     
     

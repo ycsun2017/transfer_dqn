@@ -11,6 +11,7 @@ class Param:
     plot_dir  = 'plot/'
     log_dir = 'results/'
     data_dir = 'data/'
+    logger_file = None
     def __init__(self, dtype=None, device=None):
         if dtype is not None:
             Param.dtype = dtype
