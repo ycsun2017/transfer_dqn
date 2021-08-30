@@ -13,7 +13,7 @@ class PPO(nn.Module):
                  gamma=0.99, lam = 0.97, device=torch.device("cpu"),
                 train_pi_iters=80, train_v_iters=80, train_dynamic_iters=5, target_kl=0.01,
                 transfer=False, no_detach=False, pi_lr=3e-4, vf_lr=1e-3, model_lr=1e-3, coeff=1.0, 
-                delta=True, obs_only=False, env=None, disable_encoder=False, source_aux=False, act_encoder=False, classifier=False):
+                delta=True, obs_only=False, env=None, disable_encoder=False, source_aux=False, act_encoder=False, alpha=1.0):
         super(PPO, self).__init__()
         self.cont = isinstance(action_space, Box)
         self.ac = MLPActorCritic(observation_space, action_space, encoder_hidden_sizes=[hidden_units]*encoder_layers, 
@@ -21,7 +21,7 @@ class PPO(nn.Module):
                                  policy_layers = [hidden_units]*policy_layers,
                                  feature_size = feature_size, no_grad_encoder=(not no_detach), model_lr=model_lr, 
                                  model_hidden_sizes=[hidden_units]*model_layers, obs_only=obs_only,
-                                 env=env, disable_encoder=disable_encoder, source_aux=source_aux, act_encoder=act_encoder, classifier=classifier).to(Param.device)
+                                 env=env, disable_encoder=disable_encoder, source_aux=source_aux, act_encoder=act_encoder).to(Param.device)
         self.var_counts = tuple(count_vars(module) for module in [self.ac.pi, self.ac.v])
         self.feature_size = feature_size
         self.transfer = transfer
@@ -37,7 +37,7 @@ class PPO(nn.Module):
         self.coeff = coeff
         self.obs_only = obs_only
         self.source_aux = source_aux
-        self.classifier = classifier
+        self.alpha=alpha
         
     def compute_loss_pi(self, data):
         obs, act, adv, logp_old = data['obs'], data['act'], data['adv'], data['logp']
@@ -81,22 +81,12 @@ class PPO(nn.Module):
                 loss_pi.backward()
             else:
                 batch, data_statistics = op_memory.sample(), op_memory.get_statistics(cont=self.cont)
-                if self.classifier:
-                    if self.obs_only:
-                        loss_obs, loss_classifier = self.ac.dynamic_model.compute_loss(self.ac.pi.encoder, batch, data_statistics)
-                        #loss = loss_pi + self.coeff*(loss_obs+loss_classifier)
-                        loss = loss_pi + self.coeff*loss_obs
-                    else:
-                        loss_reward, loss_obs, loss_classifier = self.ac.dynamic_model.compute_loss(self.ac.pi.encoder, batch, data_statistics)
-                        #loss = loss_pi + self.coeff*(loss_reward+loss_obs+ loss_classifier)
-                        loss = loss_pi + self.coeff*(loss_reward+loss_obs)     
+                if self.obs_only:
+                    loss_obs = self.ac.dynamic_model.compute_loss(self.ac.pi.encoder, batch, data_statistics)
+                    loss = loss_pi + self.coeff*loss_obs
                 else:
-                    if self.obs_only:
-                        loss_obs = self.ac.dynamic_model.compute_loss(self.ac.pi.encoder, batch, data_statistics)
-                        loss = loss_pi + self.coeff*loss_obs
-                    else:
-                        loss_reward, loss_obs = self.ac.dynamic_model.compute_loss(self.ac.pi.encoder, batch, data_statistics)
-                        loss = loss_pi + self.coeff*(loss_reward+loss_obs)              
+                    loss_reward, loss_obs = self.ac.dynamic_model.compute_loss(self.ac.pi.encoder, batch, data_statistics)
+                    loss = loss_pi + self.coeff*(loss_reward+loss_obs)              
                 loss.backward()
             self.pi_optimizer.step()
         
@@ -120,11 +110,6 @@ class PPO(nn.Module):
             
             
     def update(self, memory, op_memory):
-        
-        ### update the classifier is set to be True
-        #if self.classifier:
-            #self.ac.dynamic_model.update_classifier(self.ac.pi.encoder, op_memory)
-        
         data = memory.get()
         if (not self.transfer) or self.source_aux:
             pi_info = self.update_policy(data, transfer=False, source_aux=False)  ### Source Task
@@ -157,8 +142,8 @@ class PPO(nn.Module):
                 loss_obs = results[0]
                 return pi_info, v_info, loss_obs
             
-    def save(self, path, buffer=None):
-        self.ac.save(path, buffer=buffer)
+    def save(self, path, state_dict=None):
+        self.ac.save(path, state_dict)
         
     def load_models(self, path, load_buffer=False):
         self.ac.load_models(path, load_buffer=load_buffer)
@@ -217,39 +202,52 @@ class PPO(nn.Module):
                             'obs_mean': np.mean(np.asarray(self.obs), axis=0),
                             'obs_std':  np.std(np.asarray(self.obs), axis=0)
                             }
-            
-        num_batches     = len(self.obs)//batch_size
-        obs_batches     = np.array_split(self.obs,num_batches)
-        acs_batches     = np.array_split(self.acs,num_batches) 
-        n_obs_batches   = np.array_split(self.n_obs,num_batches) 
-        rewards_batches = np.array_split(self.rewards,num_batches)
+        target_buffer = Target_Buffer(self.obs, self.acs, self.n_obs, self.rewards)
         
-        if (Param.logger_file is not None) and (self.classifier):
-            self.ac.dynamic_model.update_classifier(self.ac.pi.encoder, None, target_data=obs_batches, train_iter=1)
-            print('Classifier Accuraccy Before Pre-trainig:{}'.format(self.ac.dynamic_model.classifier_accuracy))
-            Param.logger_file.write('Classifier Accuraccy Before Pre-training:{}\n'.format(self.ac.dynamic_model.classifier_accuracy))
-        
-        step = 0
-        for data in zip(obs_batches, acs_batches, n_obs_batches, rewards_batches):
-            losses = self.ac.dynamic_model.compute_loss(self.ac.pi.encoder, data, data_statistics)
+        optimizer = Adam(self.ac.pi.encoder.parameters(), lr=0.0001)
+        for i in range(500):
+            losses = self.ac.dynamic_model.compute_loss(self.ac.pi.encoder, None, data_statistics, buffer=target_buffer, detach=False)
             loss    = sum(losses)
-            self.pi_optimizer.zero_grad()
+            #loss    = losses[0]
+            optimizer.zero_grad()
             loss.backward()
-            self.pi_optimizer.step()
-            step += 1
-            if (step%20 == 0) and (self.classifier):
-                self.ac.dynamic_model.update_classifier(self.ac.pi.encoder, None, target_data=obs_batches, train_iter=50)
+            optimizer.step()
+            #if i%50 == 0:
+                #print('Obs Loss:{}, Reward Loss:{}'.format(losses[1], losses[0])) 
+                #total_norm = 0.
+                #for p in self.ac.pi.encoder.parameters():
+                    #param_norm = p.grad.detach().data.norm(2)
+                    #total_norm += param_norm.item() ** 2
+                #total_norm = total_norm ** (1. / 2)
+                #print("Total Norm:{}".format(total_norm))
         
-        if (Param.logger_file is not None) and (self.classifier):
-            print('Classifier Accuraccy After Pre-trainig:{}'.format(self.ac.dynamic_model.classifier_accuracy))
-            Param.logger_file.write('Classifier Accuraccy After Pre-trainig:{}\n'.format(self.ac.dynamic_model.classifier_accuracy))           
+        self.ac.dynamic_model.pretrian_reward(self.ac.pi.encoder, target_buffer, data_statistics, 
+                                              optimizer, epochs=100, alpha=self.alpha)
         
-            if Param.logger_file is not None:
-                if not self.obs_only:        
-                    print('Obs Loss:{}, Reward Loss:{}'.format(losses[1], losses[0])) 
-                    Param.logger_file.write('Obs Loss:{}, Reward Loss:{}\n'.format(losses[1], losses[0])) 
-                else:
-                    Param.logger_file.write('Obs Loss:{}\n'.format(losses[0])) 
+        if Param.logger_file is not None:
+            if not self.obs_only:        
+                print('Obs Loss:{}, Reward Loss:{}'.format(losses[1], losses[0])) 
+                Param.logger_file.write('Obs Loss:{}, Reward Loss:{}\n'.format(losses[1], losses[0])) 
+            else:
+                Param.logger_file.write('Obs Loss:{}\n'.format(losses[0])) 
+                
+
+class Target_Buffer:
+    
+    ### Store a pool of encoded source states
+    def __init__(self, obs, acs, n_obs, rewards):
+        self.obs     = obs
+        self.acs     = acs
+        self.n_obs   = n_obs
+        self.rewards = rewards
+        
+    def sample(self, batch_size):
+        index = np.random.choice(self.obs.shape[0], 
+                                 batch_size, replace=False)
+        return self.obs[index], self.acs[index], self.n_obs[index], self.rewards[index]
+    
+    def __len__(self):
+        return self.obs.shape[0]
        
     
 
