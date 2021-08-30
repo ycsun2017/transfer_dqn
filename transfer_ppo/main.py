@@ -52,7 +52,8 @@ def main(args):
                 target_kl=args.target_kl, transfer=args.transfer, no_detach=args.no_detach, 
                 pi_lr=args.pi_lr, vf_lr=args.vf_lr, model_lr=args.model_lr, 
                 coeff=args.coeff, delta=not args.no_delta, obs_only = args.obs_only, 
-                env=env, disable_encoder=args.disable_encoder, source_aux=args.source_aux, act_encoder=args.act_encoder, classifier=args.classifier)
+                env=env, disable_encoder=args.disable_encoder, source_aux=args.source_aux, 
+                act_encoder=args.act_encoder, alpha=args.alpha)
     
     ### Create Two Buffers
     obs_dim   = env.observation_space.shape
@@ -66,7 +67,8 @@ def main(args):
         model_name = args.env_name + '_' + '{}'.format(args.feature_size)
         model_name += ('_target_{}'.format(args.coeff) if args.transfer else '_source')
         model_name += ('_obs' if args.obs_only else '_both')
-        model_name += '_reward_normalize' if args.reward_normalize else ''
+        #model_name += '_reward_normalize' if args.reward_normalize else ''
+        model_name += ('_pretrain' if args.pretrain else '')
         model_path = os.path.join(Param.model_dir, model_name)
         log_path = os.path.join(Param.log_dir, model_name+'.txt')
         logger_file = open(log_path, 'wt')
@@ -81,10 +83,7 @@ def main(args):
     
     ### Load the pretrained environment models
     if args.transfer:
-        if not args.classifier:
-            agent.ac.load_dynamics(args.load_path, args.classifier)
-        else:
-            agent.ac.load_models(args.load_path, args.classifier)
+        agent.ac.load_models(args.load_path, load_buffer=args.load_buffer)
         if args.pretrain:
             agent.pretrain_env_model(env, num_t=20)
     
@@ -186,11 +185,16 @@ def main(args):
             if eval_return > max_eval_reward:
                 max_eval_reward = eval_return
                 if args.save_buffer:
-                    from_numpy = lambda x: torch.from_numpy(x).to(Param.device).type(Param.dtype)
-                    states_saved = agent.ac.pi.encoder(from_numpy(np.asarray(op_memory.obs)[-len(op_memory.obs)//10:])).to(Param.device).type(Param.dtype)
+                    state_dict = {
+                                'obs': np.asarray(op_memory.obs)[-len(op_memory.obs)//5:],
+                                'rewards': np.asarray(op_memory.rewards)[-len(op_memory.rewards)//5:],
+                                'acs': np.asarray(op_memory.acs)[-len(op_memory.acs)//5:],
+                                'source_encoder': (agent.ac.pi.encoder, agent.ac.dynamic_model.r_encoder)
+                    }
+                    state_dict['source_statistics'] = op_memory.get_statistics(cont=True)
                 else:
-                    states_saved = None
-                agent.save(model_path, states_saved)
+                    state_dict = None
+                agent.save(model_path, state_dict)
         
             
             
@@ -238,7 +242,8 @@ if __name__ == '__main__':
     parser.add_argument('--steps-per-epoch', type=int, default=4000)
     parser.add_argument('--eval-trajectories', type=int, default=10)
     parser.add_argument('--seed', type=int, default=1)
-    parser.add_argument('--coeff', type=float, default=5)
+    parser.add_argument('--coeff', type=float, default=5.)
+    parser.add_argument('--alpha', type=float, default=1.0)
 
     parser.add_argument('--disable-encoder', action='store_true', default=False)
     parser.add_argument('--feature-size', type=int, default=64)
@@ -254,9 +259,8 @@ if __name__ == '__main__':
     parser.add_argument('--no-detach', action='store_true', default=False)
     parser.add_argument('--source-aux', action='store_true', default=False)
     parser.add_argument('--pretrain', action='store_true', default=False)
-
-    parser.add_argument('--classifier', action='store_true', default=False)
     parser.add_argument('--save-buffer', action='store_true', default=False)
+    parser.add_argument('--load-buffer', action='store_true', default=False)
     
     parser.add_argument('--buffer-size', type=int, default=500000)
     parser.add_argument('--batch-size',  type=int, default=256)
