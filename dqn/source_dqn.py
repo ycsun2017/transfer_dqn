@@ -67,6 +67,7 @@ parser.add_argument('--name', type=str, default="source")
 parser.add_argument('--episodes', type=int, default=100)
 parser.add_argument('--feature-size', type=int, default=8)
 parser.add_argument('--hiddens', type=int, default=32)
+parser.add_argument('--head-layers', type=int, default=2)
 parser.add_argument('--coeff', type=float, default=1.0)
 parser.add_argument('--lr', type=float, default=1e-3)
 parser.add_argument('-target', action="store_true")
@@ -243,11 +244,11 @@ class L2Norm(nn.Module):
 
 class DQN(nn.Module):
 
-    def __init__(self, inputs, outputs, hiddens, feature_size):
+    def __init__(self, inputs, outputs, hiddens, feature_size, head_layers=2):
         super(DQN, self).__init__()
 
         self.encoder = build_mlp(inputs, feature_size, 2, hiddens, norm=True)
-        self.head = build_mlp(feature_size, outputs, 2, hiddens)
+        self.head = build_mlp(feature_size, outputs, head_layers, hiddens)
 
     # Called with either one element to determine next action, or a batch
     # during optimization. Returns tensor([[left0exp,right0exp]...]).
@@ -266,8 +267,8 @@ class ActionDynamicModel(nn.Module):
         self.num_actions = num_actions
         self.enc_size = feature_size
         
-        self.transitions = build_mlp(self.enc_size, self.enc_size*self.num_actions, 1, self.h_size)
-        self.rewards = build_mlp(self.enc_size, self.num_actions, 1, self.h_size)
+        self.transitions = build_mlp(self.enc_size, self.enc_size*self.num_actions, 0, self.h_size)
+        self.rewards = build_mlp(self.enc_size, self.num_actions, 0, self.h_size)
     
     def forward(self, encoding, actions):
         dist_actions = actions.flatten() #torch.LongTensor(actions).to(device)
@@ -339,8 +340,10 @@ TARGET_UPDATE = 10
 # Get number of actions from gym action space
 n_actions = env.action_space.n
 state_size = env.observation_space.shape[0]
-policy_net = DQN(state_size, n_actions, hiddens=args.hiddens, feature_size=args.feature_size).to(device)
-target_net = DQN(state_size, n_actions, hiddens=args.hiddens, feature_size=args.feature_size).to(device)
+policy_net = DQN(state_size, n_actions, hiddens=args.hiddens, feature_size=args.feature_size, 
+                head_layers=args.head_layers).to(device)
+target_net = DQN(state_size, n_actions, hiddens=args.hiddens, feature_size=args.feature_size, 
+                head_layers=args.head_layers).to(device)
 target_net.load_state_dict(policy_net.state_dict())
 target_net.eval()
 print(policy_net)

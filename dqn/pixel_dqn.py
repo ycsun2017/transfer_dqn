@@ -67,6 +67,7 @@ parser.add_argument('--name', type=str, default="source")
 parser.add_argument('--episodes', type=int, default=100)
 parser.add_argument('--feature-size', type=int, default=8)
 parser.add_argument('--hiddens', type=int, default=32)
+parser.add_argument('--head-layers', type=int, default=2)
 parser.add_argument('--seed', type=int, default=0)
 parser.add_argument('--coeff', type=float, default=1.0)
 parser.add_argument('--lr', type=float, default=1e-3)
@@ -304,10 +305,10 @@ class Encoder(nn.Module):
 
 class DQN(nn.Module):
 
-    def __init__(self, h, w, outputs, feature_size, hiddens):
+    def __init__(self, h, w, outputs, feature_size, hiddens, head_layers=2):
         super(DQN, self).__init__()
         self.encoder = Encoder(h, w, feature_size)
-        self.head = build_mlp(feature_size, outputs, 2, hiddens)
+        self.head = build_mlp(feature_size, outputs, head_layers, hiddens)
 
     # Called with either one element to determine next action, or a batch
     # during optimization. Returns tensor([[left0exp,right0exp]...]).
@@ -411,8 +412,10 @@ _, _, screen_height, screen_width = init_screen.shape
 # Get number of actions from gym action space
 n_actions = env.action_space.n
 
-policy_net = DQN(screen_height, screen_width, n_actions, feature_size=args.feature_size, hiddens=args.hiddens).to(device)
-target_net = DQN(screen_height, screen_width, n_actions, feature_size=args.feature_size, hiddens=args.hiddens).to(device)
+policy_net = DQN(screen_height, screen_width, n_actions, feature_size=args.feature_size, 
+                    hiddens=args.hiddens, head_layers=args.head_layers).to(device)
+target_net = DQN(screen_height, screen_width, n_actions, feature_size=args.feature_size, 
+                    hiddens=args.hiddens, head_layers=args.head_layers).to(device)
 print("policy", policy_net)
 target_net.load_state_dict(policy_net.state_dict())
 target_net.eval()
@@ -422,8 +425,9 @@ print("dynamics", dynamic_model)
 
 optimizer = optim.Adam(policy_net.parameters(), lr=args.lr)
 if args.transfer:
-    dynamic_model.load_state_dict(torch.load(args.load_from)["dynamics"])
-    print("loaded from", args.load_from)
+    if args.load_from:
+        dynamic_model.load_state_dict(torch.load(args.load_from)["dynamics"])
+        print("loaded from", args.load_from)
 else:   
     model_optimizer = optim.Adam(dynamic_model.parameters(), lr=args.lr)
 
