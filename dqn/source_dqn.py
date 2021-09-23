@@ -42,7 +42,7 @@ We'll also use the following from PyTorch:
 -  utilities for vision tasks (``torchvision`` - `a separate
    package <https://github.com/pytorch/vision>`__).
 """
-
+import os
 import gym
 import math
 import random
@@ -61,15 +61,25 @@ import torchvision.transforms as T
 import argparse
 parser = argparse.ArgumentParser()
 
+parser.add_argument('--env', type=str, default="CartPole-v0")
+parser.add_argument('--env-name', type=str, default="cartpole")
 parser.add_argument('--name', type=str, default="source")
 parser.add_argument('--episodes', type=int, default=100)
+parser.add_argument('--feature-size', type=int, default=8)
+parser.add_argument('--hiddens', type=int, default=32)
 parser.add_argument('--coeff', type=float, default=1.0)
+parser.add_argument('--lr', type=float, default=1e-3)
 parser.add_argument('-target', action="store_true")
 parser.add_argument('-no-reg', action="store_true")
+parser.add_argument('-detach-next', action="store_true")
 parser.add_argument('--load-from', type=str, default="")
 args = parser.parse_args()
 
-env = gym.make('CartPole-v0').unwrapped
+env = gym.make(args.env).unwrapped
+
+save_path = "data/{}/".format(args.env_name)
+os.makedirs(save_path, exist_ok=True)
+os.makedirs("learned_models/{}/".format(args.env_name), exist_ok=True)
 
 # set up matplotlib
 is_ipython = 'inline' in matplotlib.get_backend()
@@ -329,21 +339,21 @@ TARGET_UPDATE = 10
 # Get number of actions from gym action space
 n_actions = env.action_space.n
 state_size = env.observation_space.shape[0]
-policy_net = DQN(state_size, n_actions, hiddens=32, feature_size=8).to(device)
-target_net = DQN(state_size, n_actions, hiddens=32, feature_size=8).to(device)
+policy_net = DQN(state_size, n_actions, hiddens=args.hiddens, feature_size=args.feature_size).to(device)
+target_net = DQN(state_size, n_actions, hiddens=args.hiddens, feature_size=args.feature_size).to(device)
 target_net.load_state_dict(policy_net.state_dict())
 target_net.eval()
 print(policy_net)
 
-dynamic_model = ActionDynamicModel(feature_size=8, num_actions=n_actions, hiddens=64).to(device)
+dynamic_model = ActionDynamicModel(feature_size=args.feature_size, num_actions=n_actions, hiddens=64).to(device)
 print(dynamic_model)
 
-optimizer = optim.Adam(policy_net.parameters(), lr=1e-3)
+optimizer = optim.Adam(policy_net.parameters(), lr=args.lr)
 if args.target:
     dynamic_model.load_state_dict(torch.load(args.load_from)["dynamics"])
     print("loaded from", args.load_from)
 else:   
-    model_optimizer = optim.Adam(dynamic_model.parameters(), lr=1e-3)
+    model_optimizer = optim.Adam(dynamic_model.parameters(), lr=args.lr)
 memory = ReplayMemory(10000)
 
 
@@ -415,6 +425,8 @@ def model_loss(state_batch, next_batch, action_batch, reward_batch, target=False
     else:
         encodings = policy_net.encoder(state_batch)
         next_encodings = policy_net.encoder(next_batch)
+        if args.detach_next:
+            next_encodings = next_encodings.detach()
     predict_next, predict_reward = dynamic_model(encodings, action_batch)
     model_loss = criterion(predict_next, next_encodings) + criterion(predict_reward.flatten(), reward_batch)
 
@@ -437,7 +449,7 @@ def optimize_model():
                                                 if s is not None])
     state_batch = torch.cat(batch.state)
     action_batch = torch.cat(batch.action)
-    reward_batch = torch.cat(batch.reward)
+    reward_batch = torch.cat(batch.reward).float()
 
     # Compute Q(s_t, a) - the model computes Q(s_t), then we select the
     # columns of actions taken. These are the actions which would've been taken
@@ -457,6 +469,8 @@ def optimize_model():
     # optimize dynamics model
     if not args.target:
         loss_model_target = model_loss(state_batch[non_final_mask], non_final_next_states, action_batch[non_final_mask], reward_batch[non_final_mask], target=True)
+        # print(loss_model_target)
+        # print(loss_model_target.type())
         model_optimizer.zero_grad()
         loss_model_target.backward()
         for param in dynamic_model.parameters():
@@ -540,9 +554,9 @@ for i_episode in range(num_episodes):
 
 print('Complete')
 plt.plot(total_rewards)
-plt.savefig("data/cartpole/{}.png".format(args.name), format="png")
+plt.savefig("data/{}/{}.png".format(args.env_name, args.name), format="png")
 plt.close()
-with open("data/cartpole/{}.txt".format(args.name), "w") as f:
+with open("data/{}/{}.txt".format(args.env_name, args.name), "w") as f:
     for i, reward in enumerate(total_rewards):
         f.write("Episode: {}, Reward: {}\n".format(i, reward))
 
@@ -551,7 +565,7 @@ torch.save({
             "encoder": policy_net.encoder.state_dict(),
             "head": policy_net.head.state_dict()
         },
-        "learned_models/cartpole/{}.pt".format(args.name)
+        "learned_models/{}/{}.pt".format(args.env_name, args.name)
     )
 
 # env.render()

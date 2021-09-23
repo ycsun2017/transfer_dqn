@@ -42,7 +42,7 @@ We'll also use the following from PyTorch:
 -  utilities for vision tasks (``torchvision`` - `a separate
    package <https://github.com/pytorch/vision>`__).
 """
-
+import os
 import gym
 import math
 import random
@@ -61,16 +61,29 @@ import torchvision.transforms as T
 import argparse
 parser = argparse.ArgumentParser()
 
+parser.add_argument('--env', type=str, default="CartPole-v0")
+parser.add_argument('--env-name', type=str, default="cartpole_pixel")
 parser.add_argument('--name', type=str, default="source")
 parser.add_argument('--episodes', type=int, default=100)
+parser.add_argument('--feature-size', type=int, default=8)
+parser.add_argument('--hiddens', type=int, default=32)
+parser.add_argument('--seed', type=int, default=0)
 parser.add_argument('--coeff', type=float, default=1.0)
+parser.add_argument('--lr', type=float, default=1e-3)
 parser.add_argument('-transfer', action="store_true")
 parser.add_argument('-no-reg', action="store_true")
+parser.add_argument('-detach-next', action="store_true")
+parser.add_argument('-decay-coeff', action="store_true")
 parser.add_argument('--load-from', type=str, default="")
 args = parser.parse_args()
 
-env = gym.make('CartPole-v0').unwrapped
+env = gym.make(args.env).unwrapped
 
+save_path = "data/{}/".format(args.env_name)
+os.makedirs(save_path, exist_ok=True)
+os.makedirs("learned_models/{}/".format(args.env_name), exist_ok=True)
+
+env.seed(args.seed)
 # set up matplotlib
 is_ipython = 'inline' in matplotlib.get_backend()
 if is_ipython:
@@ -80,8 +93,11 @@ if is_ipython:
 
 # if gpu is to be used
 device = torch.device("cuda:2" if torch.cuda.is_available() else "cpu")
-
-
+torch.manual_seed(args.seed)
+torch.cuda.manual_seed_all(args.seed)
+if torch.cuda.is_available():
+    torch.backends.cudnn.benchmark = False
+    torch.backends.cudnn.deterministic = True
 ######################################################################
 # Replay Memory
 # -------------
@@ -325,20 +341,21 @@ def get_screen():
     # Returned screen requested by gym is 400x600x3, but is sometimes larger
     # such as 800x1200x3. Transpose it into torch order (CHW).
     screen = env.render(mode='rgb_array').transpose((2, 0, 1))
-    # Cart is in the lower half, so strip off the top and bottom of the screen
-    _, screen_height, screen_width = screen.shape
-    screen = screen[:, int(screen_height*0.4):int(screen_height * 0.8)]
-    view_width = int(screen_width * 0.6)
-    cart_location = get_cart_location(screen_width)
-    if cart_location < view_width // 2:
-        slice_range = slice(view_width)
-    elif cart_location > (screen_width - view_width // 2):
-        slice_range = slice(-view_width, None)
-    else:
-        slice_range = slice(cart_location - view_width // 2,
-                            cart_location + view_width // 2)
-    # Strip off the edges, so that we have a square image centered on a cart
-    screen = screen[:, :, slice_range]
+    if args.env == "CartPole-v0":
+        # Cart is in the lower half, so strip off the top and bottom of the screen
+        _, screen_height, screen_width = screen.shape
+        screen = screen[:, int(screen_height*0.4):int(screen_height * 0.8)]
+        view_width = int(screen_width * 0.6)
+        cart_location = get_cart_location(screen_width)
+        if cart_location < view_width // 2:
+            slice_range = slice(view_width)
+        elif cart_location > (screen_width - view_width // 2):
+            slice_range = slice(-view_width, None)
+        else:
+            slice_range = slice(cart_location - view_width // 2,
+                                cart_location + view_width // 2)
+        # Strip off the edges, so that we have a square image centered on a cart
+        screen = screen[:, :, slice_range]
     # Convert to float, rescale, convert to torch tensor
     # (this doesn't require a copy)
     screen = np.ascontiguousarray(screen, dtype=np.float32) / 255
@@ -394,21 +411,21 @@ _, _, screen_height, screen_width = init_screen.shape
 # Get number of actions from gym action space
 n_actions = env.action_space.n
 
-policy_net = DQN(screen_height, screen_width, n_actions, feature_size=8, hiddens=32).to(device)
-target_net = DQN(screen_height, screen_width, n_actions, feature_size=8, hiddens=32).to(device)
+policy_net = DQN(screen_height, screen_width, n_actions, feature_size=args.feature_size, hiddens=args.hiddens).to(device)
+target_net = DQN(screen_height, screen_width, n_actions, feature_size=args.feature_size, hiddens=args.hiddens).to(device)
 print("policy", policy_net)
 target_net.load_state_dict(policy_net.state_dict())
 target_net.eval()
 
-dynamic_model = ActionDynamicModel(feature_size=8, num_actions=n_actions, hiddens=64).to(device)
+dynamic_model = ActionDynamicModel(feature_size=args.feature_size, num_actions=n_actions, hiddens=64).to(device)
 print("dynamics", dynamic_model)
 
-optimizer = optim.Adam(policy_net.parameters(), lr=1e-3)
+optimizer = optim.Adam(policy_net.parameters(), lr=args.lr)
 if args.transfer:
     dynamic_model.load_state_dict(torch.load(args.load_from)["dynamics"])
     print("loaded from", args.load_from)
 else:   
-    model_optimizer = optim.Adam(dynamic_model.parameters(), lr=1e-3)
+    model_optimizer = optim.Adam(dynamic_model.parameters(), lr=args.lr)
 
 memory = ReplayMemory(10000)
 steps_done = 0
@@ -479,12 +496,14 @@ def model_loss(state_batch, next_batch, action_batch, reward_batch, target=False
     else:
         encodings = policy_net.encoder(state_batch)
         next_encodings = policy_net.encoder(next_batch)
+        if args.detach_next:
+            next_encodings = next_encodings.detach()
     predict_next, predict_reward = dynamic_model(encodings, action_batch)
     model_loss = criterion(predict_next, next_encodings) + criterion(predict_reward.flatten(), reward_batch)
 
     return model_loss
 
-def optimize_model():
+def optimize_model(epi):
     if len(memory) < BATCH_SIZE:
         return
     transitions = memory.sample(BATCH_SIZE)
@@ -501,7 +520,7 @@ def optimize_model():
                                                 if s is not None])
     state_batch = torch.cat(batch.state)
     action_batch = torch.cat(batch.action)
-    reward_batch = torch.cat(batch.reward)
+    reward_batch = torch.cat(batch.reward).float()
 
     # Compute Q(s_t, a) - the model computes Q(s_t), then we select the
     # columns of actions taken. These are the actions which would've been taken
@@ -532,8 +551,12 @@ def optimize_model():
     criterion = nn.SmoothL1Loss()
     loss = criterion(state_action_values, expected_state_action_values.unsqueeze(1))
     if not args.no_reg:
+        if args.decay_coeff:
+            coeff = 0.1 + (args.coeff - 0.1) * (args.episodes - epi) / args.episodes
+        else:
+            coeff = args.coeff
         loss_model = model_loss(state_batch[non_final_mask], non_final_next_states, action_batch[non_final_mask], reward_batch[non_final_mask])
-        loss += args.coeff * loss_model
+        loss += coeff * loss_model
     else:
         loss_model = torch.Tensor([0])
     # Optimize the model
@@ -592,7 +615,7 @@ for i_episode in range(num_episodes):
         state = next_state
 
         # Perform one step of the optimization (on the policy network)
-        mloss = optimize_model() 
+        mloss = optimize_model(i_episode) 
         if done or t > 200:
             episode_durations.append(t + 1)
             # plot_durations()
@@ -606,9 +629,9 @@ for i_episode in range(num_episodes):
 
 print('Complete')
 plt.plot(total_rewards)
-plt.savefig("data/cartpole_pixel/{}.png".format(args.name), format="png")
+plt.savefig("data/{}/{}.png".format(args.env_name, args.name), format="png")
 plt.close()
-with open("data/cartpole_pixel/{}.txt".format(args.name), "w") as f:
+with open("data/{}/{}.txt".format(args.env_name, args.name), "w") as f:
     for i, reward in enumerate(total_rewards):
         f.write("Episode: {}, Reward: {}\n".format(i, reward))
 
@@ -617,7 +640,7 @@ torch.save({
         "encoder": policy_net.encoder.state_dict(),
         "head": policy_net.head.state_dict()
     },
-    "learned_models/cartpole_pixel/{}.pt".format(args.name)
+    "learned_models/{}/{}.pt".format(args.env_name, args.name)
 )
 
 # env.render()
