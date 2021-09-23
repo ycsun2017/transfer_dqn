@@ -257,8 +257,8 @@ class ActionDynamicModel(nn.Module):
         self.num_actions = num_actions
         self.enc_size = feature_size
         
-        self.transitions = build_mlp(self.enc_size, self.enc_size*self.num_actions, 1, self.h_size, norm=False)
-        self.rewards = build_mlp(self.enc_size, self.num_actions, 1, self.h_size, norm=False)
+        self.transitions = build_mlp(self.enc_size, self.enc_size*self.num_actions, 0, self.h_size, norm=False)
+        self.rewards = build_mlp(self.enc_size, self.num_actions, 0, self.h_size, norm=False)
     
     def forward(self, encoding, actions):
         dist_actions = actions.flatten() #torch.LongTensor(actions).to(device)
@@ -397,7 +397,7 @@ def get_screen():
 
 BATCH_SIZE = 128
 GAMMA = 0.999
-EPS_START = 0.5
+EPS_START = 0.9
 EPS_END = 0.05
 EPS_DECAY = 200
 TARGET_UPDATE = 10
