@@ -85,6 +85,7 @@ os.makedirs(save_path, exist_ok=True)
 os.makedirs("learned_models/{}/".format(args.env_name), exist_ok=True)
 
 env.seed(args.seed)
+# random.seed(args.seed)
 # set up matplotlib
 is_ipython = 'inline' in matplotlib.get_backend()
 if is_ipython:
