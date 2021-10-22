@@ -52,6 +52,7 @@ import matplotlib.pyplot as plt
 from collections import namedtuple, deque
 from itertools import count
 from PIL import Image
+import pickle
 
 import torch
 import torch.nn as nn
@@ -73,6 +74,7 @@ parser.add_argument('--lr', type=float, default=1e-3)
 parser.add_argument('-target', action="store_true")
 parser.add_argument('-no-reg', action="store_true")
 parser.add_argument('-detach-next', action="store_true")
+parser.add_argument('-save-trajs', action="store_true")
 parser.add_argument('--load-from', type=str, default="")
 args = parser.parse_args()
 
@@ -514,9 +516,14 @@ def optimize_model():
 num_episodes = args.episodes
 total_rewards = []
 mean_loss = []
+if args.save_trajs:
+    trajs = [] # list of trajactories
+
 for i_episode in range(num_episodes):
     # Initialize the environment and state
     state = env.reset()
+    if args.save_trajs:
+        traj = {"states": [], "actions": []}
     state = torch.tensor([state]).float().to(device)
     eps_reward = 0
     # last_screen = get_screen()
@@ -525,6 +532,10 @@ for i_episode in range(num_episodes):
     for t in count():
         # Select and perform an action
         action = select_action(state)
+        if args.save_trajs:
+            traj["states"].append(state)
+            traj["actions"].append(action.item())
+
         next, reward, done, _ = env.step(action.item())
         reward = torch.tensor([reward], device=device)
 
@@ -548,6 +559,10 @@ for i_episode in range(num_episodes):
             episode_durations.append(t + 1)
             # plot_durations()
             break
+    if args.save_trajs:
+        traj["states"].append(state)
+        trajs.append(traj)
+
     print("episode", i_episode, "reward", eps_reward, "loss", mloss)
     total_rewards.append(eps_reward)
     mean_loss.append(mloss)
@@ -570,6 +585,10 @@ torch.save({
         },
         "learned_models/{}/{}.pt".format(args.env_name, args.name)
     )
+
+if args.save_trajs:
+    with open('trajs/source.pkl', 'wb') as handle:
+        pickle.dump(trajs, handle, protocol=pickle.HIGHEST_PROTOCOL)
 
 # env.render()
 # env.close()
