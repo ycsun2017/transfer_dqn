@@ -65,10 +65,10 @@ parser = argparse.ArgumentParser()
 parser.add_argument('--env', type=str, default="CartPole-v0")
 parser.add_argument('--env-name', type=str, default="cartpole")
 parser.add_argument('--name', type=str, default="source")
-parser.add_argument('--episodes', type=int, default=100)
-parser.add_argument('--feature-size', type=int, default=8)
+parser.add_argument('--episodes', type=int, default=200)
+parser.add_argument('--feature-size', type=int, default=16)
 parser.add_argument('--hiddens', type=int, default=32)
-parser.add_argument('--head-layers', type=int, default=2)
+parser.add_argument('--head-layers', type=int, default=1)
 parser.add_argument('--coeff', type=float, default=1.0)
 parser.add_argument('--lr', type=float, default=1e-3)
 parser.add_argument('-target', action="store_true")
@@ -533,7 +533,7 @@ for i_episode in range(num_episodes):
         # Select and perform an action
         action = select_action(state)
         if args.save_trajs:
-            traj["states"].append(state)
+            traj["states"].append(state.detach().cpu())
             traj["actions"].append(action.item())
 
         next, reward, done, _ = env.step(action.item())
@@ -560,7 +560,8 @@ for i_episode in range(num_episodes):
             # plot_durations()
             break
     if args.save_trajs:
-        traj["states"].append(state)
+        if state is not None:
+            traj["states"].append(state.detach().cpu())
         trajs.append(traj)
 
     print("episode", i_episode, "reward", eps_reward, "loss", mloss)
