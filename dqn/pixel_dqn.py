@@ -64,10 +64,10 @@ parser = argparse.ArgumentParser()
 parser.add_argument('--env', type=str, default="CartPole-v0")
 parser.add_argument('--env-name', type=str, default="cartpole_pixel")
 parser.add_argument('--name', type=str, default="source")
-parser.add_argument('--episodes', type=int, default=100)
-parser.add_argument('--feature-size', type=int, default=8)
+parser.add_argument('--episodes', type=int, default=200)
+parser.add_argument('--feature-size', type=int, default=16)
 parser.add_argument('--hiddens', type=int, default=32)
-parser.add_argument('--head-layers', type=int, default=2)
+parser.add_argument('--head-layers', type=int, default=1)
 parser.add_argument('--seed', type=int, default=0)
 parser.add_argument('--coeff', type=float, default=1.0)
 parser.add_argument('--lr', type=float, default=1e-3)
@@ -76,6 +76,7 @@ parser.add_argument('-no-reg', action="store_true")
 parser.add_argument('-detach-next', action="store_true")
 parser.add_argument('-decay-coeff', action="store_true")
 parser.add_argument('--load-from', type=str, default="")
+parser.add_argument('-aligned', action="store_true")
 args = parser.parse_args()
 
 env = gym.make(args.env).unwrapped
@@ -85,6 +86,7 @@ os.makedirs(save_path, exist_ok=True)
 os.makedirs("learned_models/{}/".format(args.env_name), exist_ok=True)
 
 env.seed(args.seed)
+# random.seed(args.seed)
 # set up matplotlib
 is_ipython = 'inline' in matplotlib.get_backend()
 if is_ipython:
@@ -417,6 +419,13 @@ policy_net = DQN(screen_height, screen_width, n_actions, feature_size=args.featu
 target_net = DQN(screen_height, screen_width, n_actions, feature_size=args.feature_size, 
                     hiddens=args.hiddens, head_layers=args.head_layers).to(device)
 print("policy", policy_net)
+if args.aligned:
+    # load encoder and the head
+    assert args.load_from, "please specify a source model to load from"
+    policy_net.encoder.load_state_dict(torch.load(args.load_from, map_location=device)["encoder"])
+    policy_net.head.load_state_dict(torch.load(args.load_from, map_location=device)["head"])
+    print("loaded policy from ", args.load_from)
+
 target_net.load_state_dict(policy_net.state_dict())
 target_net.eval()
 
@@ -425,9 +434,9 @@ print("dynamics", dynamic_model)
 
 optimizer = optim.Adam(policy_net.parameters(), lr=args.lr)
 if args.transfer:
-    if args.load_from:
-        dynamic_model.load_state_dict(torch.load(args.load_from)["dynamics"])
-        print("loaded from", args.load_from)
+    assert args.load_from, "please specify a source model to load from"
+    dynamic_model.load_state_dict(torch.load(args.load_from)["dynamics"])
+    print("loaded from", args.load_from)
 else:   
     model_optimizer = optim.Adam(dynamic_model.parameters(), lr=args.lr)
 
