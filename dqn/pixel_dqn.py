@@ -657,7 +657,7 @@ torch.save({
 )
 
 # env.render()
-# env.close()
+env.close()
 # plt.ioff()
 # plt.show()
 

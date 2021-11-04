@@ -446,7 +446,6 @@ torch.save({
     "learned_models/{}/{}.pt".format(args.env_name, args.name)
 )
 
-# env.render()
-# env.close()
+env.close()
 # plt.ioff()
 # plt.show()
