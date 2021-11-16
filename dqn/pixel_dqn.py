@@ -72,6 +72,7 @@ parser.add_argument('--seed', type=int, default=0)
 parser.add_argument('--coeff', type=float, default=1.0)
 parser.add_argument('--lr', type=float, default=1e-3)
 parser.add_argument('-transfer', action="store_true")
+parser.add_argument('-load-head', action="store_true")
 parser.add_argument('-no-reg', action="store_true")
 parser.add_argument('-detach-next', action="store_true")
 parser.add_argument('-decay-coeff', action="store_true")
@@ -419,6 +420,12 @@ policy_net = DQN(screen_height, screen_width, n_actions, feature_size=args.featu
 target_net = DQN(screen_height, screen_width, n_actions, feature_size=args.feature_size, 
                     hiddens=args.hiddens, head_layers=args.head_layers).to(device)
 print("policy", policy_net)
+
+if args.load_head:
+    assert args.load_from, "please specify a source model to load from"
+    policy_net.head.load_state_dict(torch.load(args.load_from, map_location=device)["head"])
+    print("loaded policy from ", args.load_from)
+
 if args.aligned:
     # load encoder and the head
     assert args.load_from, "please specify a source model to load from"
