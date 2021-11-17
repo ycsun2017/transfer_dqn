@@ -70,6 +70,7 @@ parser.add_argument('--hiddens', type=int, default=32)
 parser.add_argument('--head-layers', type=int, default=1)
 parser.add_argument('--seed', type=int, default=0)
 parser.add_argument('--coeff', type=float, default=1.0)
+parser.add_argument('--decay-rate', type=int, default=200)
 parser.add_argument('--lr', type=float, default=1e-3)
 parser.add_argument('-transfer', action="store_true")
 parser.add_argument('-load-head', action="store_true")
@@ -402,8 +403,8 @@ BATCH_SIZE = 128
 GAMMA = 0.999
 EPS_START = 0.9
 EPS_END = 0.05
-EPS_DECAY = 200
-TARGET_UPDATE = 10
+EPS_DECAY = args.decay_rate
+TARGET_UPDATE = 100
 
 # Get screen size so that we can initialize layers correctly based on shape
 # returned from AI gym. Typical dimensions at this point are close to 3x40x90
@@ -447,7 +448,7 @@ if args.transfer:
 else:   
     model_optimizer = optim.Adam(dynamic_model.parameters(), lr=args.lr)
 
-memory = ReplayMemory(10000)
+memory = ReplayMemory(50000)
 steps_done = 0
 
 
@@ -462,9 +463,9 @@ def select_action(state):
             # t.max(1) will return largest column value of each row.
             # second column on max result is index of where max element was
             # found, so we pick action with the larger expected reward.
-            return policy_net(state).max(1)[1].view(1, 1)
+            return policy_net(state).max(1)[1].view(1, 1), eps_threshold
     else:
-        return torch.tensor([[random.randrange(n_actions)]], device=device, dtype=torch.long)
+        return torch.tensor([[random.randrange(n_actions)]], device=device, dtype=torch.long), eps_threshold
 
 
 episode_durations = []
@@ -604,6 +605,7 @@ def optimize_model(epi):
 
 num_episodes = args.episodes
 total_rewards = []
+total_steps = 0
 mean_loss = []
 
 for i_episode in range(num_episodes):
@@ -614,8 +616,9 @@ for i_episode in range(num_episodes):
     state = current_screen - last_screen
     eps_reward = 0
     for t in count():
+        total_steps += 1
         # Select and perform an action
-        action = select_action(state)
+        action, eps = select_action(state)
         _, reward, done, _ = env.step(action.item())
         reward = torch.tensor([reward], device=device)
 
@@ -636,16 +639,17 @@ for i_episode in range(num_episodes):
 
         # Perform one step of the optimization (on the policy network)
         mloss = optimize_model(i_episode) 
+        if total_steps % TARGET_UPDATE == 0:
+            target_net.load_state_dict(policy_net.state_dict())
         if done or t > 200:
             episode_durations.append(t + 1)
             # plot_durations()
             break
-    print("episode", i_episode, "reward", eps_reward, "loss", mloss)
+    print("episode", i_episode, "reward", eps_reward, "loss", mloss, "eps", eps)
     total_rewards.append(eps_reward)
     mean_loss.append(mloss)
     # Update the target network, copying all weights and biases in DQN
-    if i_episode % TARGET_UPDATE == 0:
-        target_net.load_state_dict(policy_net.state_dict())
+    
 
 print('Complete')
 plt.plot(total_rewards)
